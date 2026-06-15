@@ -16,8 +16,9 @@ use std::collections::HashMap;
 use substreams::{
     pb::substreams::StoreDeltas,
     store::{
-        StoreAddBigInt, StoreGet, StoreGetInt64, StoreGetProto, StoreGetString, StoreNew, StoreSet,
-        StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetString,
+        StoreAddBigInt, StoreGet, StoreGetInt64, StoreGetProto, StoreGetString, StoreNew,
+        StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto,
+        StoreSetIfNotExistsString,
     },
 };
 use substreams_ethereum::{
@@ -84,7 +85,7 @@ pub fn store_token_set(map: BlockTransactionProtocolComponents, store: StoreSetI
 }
 
 #[substreams::handlers::store]
-pub fn store_token_mapping(block: eth::v2::Block, store: StoreSetString) {
+pub fn store_token_mapping(block: eth::v2::Block, store: StoreSetIfNotExistsString) {
     block.transactions().for_each(|tx| {
         tx.logs_with_calls()
             .filter(|(log, _)| log.address.as_slice() == VAULT_ADDRESS)
@@ -98,7 +99,7 @@ pub fn store_token_mapping(block: eth::v2::Block, store: StoreSetString) {
                 {
                     if let Some(underlying_token) = find_underlying_token(call.call, &wrapped_token)
                     {
-                        store.set(
+                        store.set_if_not_exists(
                             0,
                             buffer_mapping_key(&wrapped_token),
                             &hex::encode(underlying_token),
