@@ -1212,6 +1212,7 @@ pub trait RPCClient: Send + Sync {
             .map(|pages| pages.into_iter().flatten().collect())
     }
 
+    #[allow(clippy::extra_unused_lifetimes)]
     async fn get_snapshots<'a>(
         &self,
         request: &SnapshotParameters<'a>,
@@ -1815,6 +1816,7 @@ impl RPCClient for HttpRPCClient {
         ))
     }
 
+    #[allow(clippy::extra_unused_lifetimes)]
     async fn get_snapshots<'a>(
         &self,
         request: &SnapshotParameters<'a>,

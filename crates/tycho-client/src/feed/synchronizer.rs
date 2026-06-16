@@ -469,6 +469,7 @@ where
     ///
     /// The returned `end_rx` (if any) should be reused for retry attempts since the close
     /// signal may still arrive and we want to remain cancellable across retries.
+    #[allow(clippy::result_large_err)]
     #[instrument(skip(self, block_tx, end_rx), fields(extractor_id = %self.extractor_id))]
     async fn state_sync(
         &mut self,
@@ -1300,6 +1301,7 @@ mod test {
                 .await
         }
 
+        #[allow(clippy::extra_unused_lifetimes)]
         async fn get_snapshots<'a>(
             &self,
             request: &SnapshotParameters<'a>,

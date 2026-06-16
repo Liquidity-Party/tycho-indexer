@@ -1509,6 +1509,7 @@ pub async fn health() -> Result<HttpResponse, RpcError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::extra_unused_lifetimes)]
 mod tests {
     use std::{collections::HashMap, env, str::FromStr};
 

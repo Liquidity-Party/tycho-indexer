@@ -1,3 +1,57 @@
+## [0.312.0](https://github.com/propeller-heads/tycho/compare/0.311.0...0.312.0) (2026-06-16)
+
+
+### Features
+
+* add Fermiswap execution ([1ee2a94](https://github.com/propeller-heads/tycho/commit/1ee2a945877e43d8b98be425bd3b8f1052f78ca5))
+* add Fermiswap executor ([92b1a85](https://github.com/propeller-heads/tycho/commit/92b1a853f63be8ca08b98860e83a522da005bc08))
+* add fermiswap pair proto ([a564bc5](https://github.com/propeller-heads/tycho/commit/a564bc5cf065a2cb3df8d3f0aa7abb8c9e3a1a10))
+* add FermiSwap VM adapter ([9899932](https://github.com/propeller-heads/tycho/commit/98999321fa820b965de49fd2b33f88e7d1789c91))
+* add FermiSwap VM execution support ([fa4a581](https://github.com/propeller-heads/tycho/commit/fa4a58159f23473219a33be4d5262aae2691bf93))
+* add registry abi ([48178b9](https://github.com/propeller-heads/tycho/commit/48178b9bd267b1b754966c6ee7ffc0e131e690f7))
+* emit Fermi oracle timestamp overrides ([93c29eb](https://github.com/propeller-heads/tycho/commit/93c29ebfb59b97ff700354be567884e326a0e068))
+* fermiswap integration ([#1034](https://github.com/propeller-heads/tycho/issues/1034)) ([049fef0](https://github.com/propeller-heads/tycho/commit/049fef0aac8ad1e27d6d3f59fe2827b00dee5b0a))
+* index FermiSwap pairs with proto-backed stores ([be5010b](https://github.com/propeller-heads/tycho/commit/be5010b9b985ecfa6c88190c381ff04be6a404f2))
+* init fermiswap ([fe88350](https://github.com/propeller-heads/tycho/commit/fe883505ad52e6a2ca6c56e603a5955a64eea9de))
+* support oracle registry ([d49e4af](https://github.com/propeller-heads/tycho/commit/d49e4af6ce38fdc2f6f50cf0fa3d55a2d65c37b5))
+* track Fermi registry block overrides ([c687a46](https://github.com/propeller-heads/tycho/commit/c687a464a9a0fcb30f29289f2e3175530d11f3c4))
+* track Fermi registry block overrides ([dd4e050](https://github.com/propeller-heads/tycho/commit/dd4e05038b23c43d2a2ab7f9186e06fbc5cc4817))
+
+
+### Bug Fixes
+
+* address slither warning and adapater test failing ([d75f320](https://github.com/propeller-heads/tycho/commit/d75f3208091d8d2813bd9badc21ccb4961ff0d3b))
+* ci lint ([41d78f9](https://github.com/propeller-heads/tycho/commit/41d78f98017630d2c719e428a79e7d529e302140))
+* component id parse error ([45dd438](https://github.com/propeller-heads/tycho/commit/45dd43887fe82a0803b158087f241b1be9034951))
+* handle weth token balance deltas ([106bf66](https://github.com/propeller-heads/tycho/commit/106bf6685e1f9f2790413822dfb975de2d5c959c))
+* resolve CI failures ([4221075](https://github.com/propeller-heads/tycho/commit/4221075a5e2de1471d964f1e8d9b9833acc03054))
+* support FermiSwap VM state tracking ([bdae445](https://github.com/propeller-heads/tycho/commit/bdae445e559befb4b2813de2a2363e50c20b2290))
+* update fermiswap balance delta handling ([f3aeba6](https://github.com/propeller-heads/tycho/commit/f3aeba6ffdc3154f487623aaeeff2e9b9e0c4983))
+
+## [0.311.0](https://github.com/propeller-heads/tycho/compare/0.310.0...0.311.0) (2026-06-16)
+
+
+### Features
+
+* add LunarBase protocol integration ([#1053](https://github.com/propeller-heads/tycho/issues/1053)) ([632ee01](https://github.com/propeller-heads/tycho/commit/632ee0153340f6ee4ecd2770f524c5b1521f450e))
+* add test for grouped swaps gas estimates ([1738b67](https://github.com/propeller-heads/tycho/commit/1738b67af4c172887c2af58b4359601e4d51dcc8))
+* include group swap logic in gas estimations ([ba3237e](https://github.com/propeller-heads/tycho/commit/ba3237e944515ecf21af025187875939e9b5fb67))
+* include group swap logic in gas estimations ([#1085](https://github.com/propeller-heads/tycho/issues/1085)) ([856a4c1](https://github.com/propeller-heads/tycho/commit/856a4c1eeeb66d9804bc499b7daaee03d8f0446f))
+
+
+### Bug Fixes
+
+* address lunarbase integration review feedback ([587a762](https://github.com/propeller-heads/tycho/commit/587a76265daf7cf31052cc96f61dac2035154096))
+* bump packages to resolve cargo audit and cargo lints ([afd8eca](https://github.com/propeller-heads/tycho/commit/afd8ecaf5b1912bcadb26bdd3af9184f3f727820))
+* bump packages to resolve cargo audit and cargo lints ([#1091](https://github.com/propeller-heads/tycho/issues/1091)) ([3f7d68f](https://github.com/propeller-heads/tycho/commit/3f7d68f6b823412ff14f065aebe802fa01b96f9f))
+* clean up LunarBase substreams CI issues ([0cbe056](https://github.com/propeller-heads/tycho/commit/0cbe0561c730311887e4317d924563d45fe77919))
+* format LunarBase state freshness check ([f55b5ed](https://github.com/propeller-heads/tycho/commit/f55b5ed0b971c133cbd5a508a6aad1f8c17c2ab4))
+* **lunarbase:** default quotes to whitelisted swap caller ([45ce3ce](https://github.com/propeller-heads/tycho/commit/45ce3ce345456939dcc1504891890a21685a6fe1))
+* remove dead code constants ([2f7b0dd](https://github.com/propeller-heads/tycho/commit/2f7b0dd51d54b84944fc3d6736b6371c14b6ee39))
+* revert unrelated testing harness changes ([f2a462a](https://github.com/propeller-heads/tycho/commit/f2a462a7764ebce3fb938aa8dd5cb1cf08a93b79))
+* update strategy type ([03449dc](https://github.com/propeller-heads/tycho/commit/03449dc9f7b4345a0a25e4bfd365604003f25911))
+* use group protocol_system instead of first swap's ([cb0dd5b](https://github.com/propeller-heads/tycho/commit/cb0dd5b694d577548c226b5074f0a29f069c6d08))
+
 ## [0.310.0](https://github.com/propeller-heads/tycho/compare/0.309.0...0.310.0) (2026-06-12)
 
 
