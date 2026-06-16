@@ -1,6 +1,5 @@
 use crate::{
     abi::vault_contract::events::{LiquidityAdded, LiquidityRemoved, Swap},
-    constants::VAULT_ADDRESS,
     utils::{address_id, mapping_storage_key_for_address},
 };
 use keccak_hash::keccak;
@@ -42,9 +41,10 @@ struct PoolBalanceStorageDelta {
 pub(crate) fn pool_balance_seed_deltas(
     block: &eth::v2::Block,
     store: &StoreGetProto<ProtocolComponent>,
+    vault_address: &[u8],
 ) -> Vec<BalanceDelta> {
-    let candidates = collect_pool_balance_candidates(block, store);
-    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates);
+    let candidates = collect_pool_balance_candidates(block, store, vault_address);
+    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates, vault_address);
     get_pool_balance_seed_deltas(&storage_deltas)
 }
 
@@ -79,9 +79,10 @@ pub(crate) fn relative_pool_balance_deltas(
     block: &eth::v2::Block,
     components_store: &StoreGetProto<ProtocolComponent>,
     seeded_pool_balances: &StoreGetInt64,
+    vault_address: &[u8],
 ) -> Vec<BalanceDelta> {
-    let candidates = collect_pool_balance_candidates(block, components_store);
-    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates);
+    let candidates = collect_pool_balance_candidates(block, components_store, vault_address);
+    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates, vault_address);
 
     get_pool_token_balance_deltas(&storage_deltas, seeded_pool_balances)
 }
@@ -89,6 +90,7 @@ pub(crate) fn relative_pool_balance_deltas(
 fn collect_pool_balance_candidates(
     block: &eth::v2::Block,
     store: &StoreGetProto<ProtocolComponent>,
+    vault_address: &[u8],
 ) -> CandidateComponents {
     let mut candidate_components: CandidateComponents = HashMap::new();
 
@@ -97,7 +99,7 @@ fn collect_pool_balance_candidates(
     // and rounding are already reflected in the final storage write.
     block
         .logs()
-        .filter(|log| log.address() == VAULT_ADDRESS)
+        .filter(|log| log.address() == vault_address)
         .for_each(|vault_log| {
             if let Some(pool) = pool_from_balance_event(vault_log.log) {
                 let tx_index = u64::from(vault_log.receipt.transaction.index);
@@ -132,6 +134,7 @@ fn pool_from_balance_event(log: &eth::v2::Log) -> Option<Vec<u8>> {
 fn get_pool_token_balance_storage_deltas(
     block: &eth::v2::Block,
     candidate_components: &CandidateComponents,
+    vault_address: &[u8],
 ) -> Vec<PoolBalanceStorageDelta> {
     let mut storage_deltas = Vec::new();
 
@@ -151,7 +154,7 @@ fn get_pool_token_balance_storage_deltas(
         tx.calls
             .iter()
             .filter(|call| !call.state_reverted)
-            .filter(|call| call.address == VAULT_ADDRESS)
+            .filter(|call| call.address == vault_address)
             .for_each(|call| {
                 for change in &call.storage_changes {
                     add_pool_token_balance_storage_delta(

@@ -1,4 +1,8 @@
-use crate::{abi, constants::VAULT_ADDRESS, utils::address_id};
+use crate::{
+    abi,
+    params::DeploymentConfig,
+    utils::address_id,
+};
 use abi::{
     reclamm_pool_factory_contract::{
         events::PoolCreated as ReClammPoolCreated, functions::Create as ReClammPoolCreate,
@@ -10,7 +14,7 @@ use abi::{
         events::PoolCreated as WeightedPoolCreated, functions::Create as WeightedPoolCreate,
     },
 };
-use substreams::{hex, scalar::BigInt};
+use substreams::scalar::BigInt;
 use substreams_ethereum::{
     pb::eth::v2::{Call, Log},
     Event, Function,
@@ -35,133 +39,135 @@ pub fn address_map(
     pool_factory_address: &[u8],
     log: &Log,
     call: &Call,
+    config: &DeploymentConfig,
 ) -> Option<ProtocolComponent> {
-    match *pool_factory_address {
-        hex!("201efd508c8DfE9DE1a13c2452863A78CB2a86Cc") => {
-            let WeightedPoolCreate {
-                tokens: token_config,
-                normalized_weights,
-                swap_fee_percentage,
-                ..
-            } = WeightedPoolCreate::match_and_decode(call)?;
-            let WeightedPoolCreated { pool } = WeightedPoolCreated::match_and_decode(log)?;
-            let rate_providers = collect_rate_providers(&token_config);
+    if pool_factory_address == config.weighted_factory.as_slice() {
+        let WeightedPoolCreate {
+            tokens: token_config,
+            normalized_weights,
+            swap_fee_percentage,
+            ..
+        } = WeightedPoolCreate::match_and_decode(call)?;
+        let WeightedPoolCreated { pool } = WeightedPoolCreated::match_and_decode(log)?;
+        let rate_providers = collect_rate_providers(&token_config);
 
-            // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
-            // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
-            // to test that the adapter supports it correctly and ERC4626 overwrites are handled
-            // correctly in simulation.
-            let tokens = token_config
-                .into_iter()
-                .map(|t| t.0)
-                .collect::<Vec<_>>();
+        // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
+        // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
+        // to test that the adapter supports it correctly and ERC4626 overwrites are handled
+        // correctly in simulation.
+        let tokens = token_config
+            .into_iter()
+            .map(|t| t.0)
+            .collect::<Vec<_>>();
 
-            let normalized_weights_bytes =
-                json_serialize_bigint_list(normalized_weights.as_slice());
-            let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
-            let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
+        let normalized_weights_bytes = json_serialize_bigint_list(normalized_weights.as_slice());
+        let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
+        let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
 
-            let mut attributes = vec![
-                ("pool_type", "WeightedPoolFactory".as_bytes()),
-                ("normalized_weights", &normalized_weights_bytes),
-                ("fee", &fee_bytes),
-                ("manual_updates", &[1u8]),
-            ];
+        let mut attributes = vec![
+            ("pool_type", "WeightedPoolFactory".as_bytes()),
+            ("normalized_weights", &normalized_weights_bytes),
+            ("fee", &fee_bytes),
+            ("manual_updates", &[1u8]),
+        ];
 
-            if !rate_providers.is_empty() {
-                attributes.push(("rate_providers", &rate_providers_bytes));
-            }
-
-            Some(create_pool_component(&pool, tokens.as_slice(), &attributes))
+        if !rate_providers.is_empty() {
+            attributes.push(("rate_providers", &rate_providers_bytes));
         }
-        hex!("B9d01CA61b9C181dA1051bFDd28e1097e920AB14") => {
-            let StablePoolCreate { tokens: token_config, swap_fee_percentage, .. } =
-                StablePoolCreate::match_and_decode(call)?;
-            let StablePoolCreated { pool } = StablePoolCreated::match_and_decode(log)?;
-            let rate_providers = collect_rate_providers(&token_config);
 
-            // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
-            // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
-            // to test that the adapter supports it correctly and ERC4626 overwrites are handled
-            // correctly in simulation.
-            let tokens = token_config
-                .into_iter()
-                .map(|t| t.0)
-                .collect::<Vec<_>>();
-
-            let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
-            let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
-
-            let mut attributes = vec![
-                ("pool_type", "StablePoolFactory".as_bytes()),
-                ("bpt", &pool),
-                ("fee", &fee_bytes),
-                ("manual_updates", &[1u8]),
-            ];
-
-            if !rate_providers.is_empty() {
-                attributes.push(("rate_providers", &rate_providers_bytes));
-            }
-
-            Some(create_pool_component(&pool, tokens.as_slice(), &attributes))
-        }
-        hex!("3ccD78683efFffdDc1A16f5553C896ac6D3ab7FF") => {
-            let ReClammPoolCreate {
-                tokens: token_config,
-                swap_fee_percentage,
-                price_params,
-                daily_price_shift_exponent,
-                centeredness_margin,
-                ..
-            } = ReClammPoolCreate::match_and_decode(call)?;
-            let ReClammPoolCreated { pool } = ReClammPoolCreated::match_and_decode(log)?;
-            let rate_providers = collect_rate_providers(&token_config);
-
-            let tokens = token_config
-                .iter()
-                .map(|t| t.0.clone())
-                .collect::<Vec<_>>();
-
-            let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
-            let initial_min_price_bytes = price_params.0.to_signed_bytes_be();
-            let initial_max_price_bytes = price_params.1.to_signed_bytes_be();
-            let initial_target_price_bytes = price_params.2.to_signed_bytes_be();
-            let daily_price_shift_exponent_bytes = daily_price_shift_exponent.to_signed_bytes_be();
-            let centeredness_margin_bytes = centeredness_margin.to_signed_bytes_be();
-            let token_a_price_includes_rate_bytes = [price_params.3 as u8];
-            let token_b_price_includes_rate_bytes = [price_params.4 as u8];
-            let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
-
-            let mut attributes = vec![
-                ("pool_type", "ReClammPoolFactory".as_bytes()),
-                ("fee", &fee_bytes),
-                ("manual_updates", &[1u8]),
-                ("initial_min_price", &initial_min_price_bytes),
-                ("initial_max_price", &initial_max_price_bytes),
-                ("initial_target_price", &initial_target_price_bytes),
-                ("daily_price_shift_exponent", &daily_price_shift_exponent_bytes),
-                ("centeredness_margin", &centeredness_margin_bytes),
-                ("token_a_price_includes_rate", &token_a_price_includes_rate_bytes),
-                ("token_b_price_includes_rate", &token_b_price_includes_rate_bytes),
-            ];
-
-            if !rate_providers.is_empty() {
-                attributes.push(("rate_providers", &rate_providers_bytes));
-            }
-
-            Some(create_pool_component(&pool, tokens.as_slice(), &attributes))
-        }
-        _ => None,
+        return Some(create_pool_component(&pool, tokens.as_slice(), &attributes, config));
     }
+
+    if pool_factory_address == config.stable_factory.as_slice() {
+        let StablePoolCreate { tokens: token_config, swap_fee_percentage, .. } =
+            StablePoolCreate::match_and_decode(call)?;
+        let StablePoolCreated { pool } = StablePoolCreated::match_and_decode(log)?;
+        let rate_providers = collect_rate_providers(&token_config);
+
+        // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
+        // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
+        // to test that the adapter supports it correctly and ERC4626 overwrites are handled
+        // correctly in simulation.
+        let tokens = token_config
+            .into_iter()
+            .map(|t| t.0)
+            .collect::<Vec<_>>();
+
+        let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
+        let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
+
+        let mut attributes = vec![
+            ("pool_type", "StablePoolFactory".as_bytes()),
+            ("bpt", &pool),
+            ("fee", &fee_bytes),
+            ("manual_updates", &[1u8]),
+        ];
+
+        if !rate_providers.is_empty() {
+            attributes.push(("rate_providers", &rate_providers_bytes));
+        }
+
+        return Some(create_pool_component(&pool, tokens.as_slice(), &attributes, config));
+    }
+
+    if pool_factory_address == config.reclamm_factory.as_slice() {
+        let ReClammPoolCreate {
+            tokens: token_config,
+            swap_fee_percentage,
+            price_params,
+            daily_price_shift_exponent,
+            centeredness_margin,
+            ..
+        } = ReClammPoolCreate::match_and_decode(call)?;
+        let ReClammPoolCreated { pool } = ReClammPoolCreated::match_and_decode(log)?;
+        let rate_providers = collect_rate_providers(&token_config);
+
+        let tokens = token_config
+            .iter()
+            .map(|t| t.0.clone())
+            .collect::<Vec<_>>();
+
+        let fee_bytes = swap_fee_percentage.to_signed_bytes_be();
+        let initial_min_price_bytes = price_params.0.to_signed_bytes_be();
+        let initial_max_price_bytes = price_params.1.to_signed_bytes_be();
+        let initial_target_price_bytes = price_params.2.to_signed_bytes_be();
+        let daily_price_shift_exponent_bytes = daily_price_shift_exponent.to_signed_bytes_be();
+        let centeredness_margin_bytes = centeredness_margin.to_signed_bytes_be();
+        let token_a_price_includes_rate_bytes = [price_params.3 as u8];
+        let token_b_price_includes_rate_bytes = [price_params.4 as u8];
+        let rate_providers_bytes = json_serialize_address_list(rate_providers.as_slice());
+
+        let mut attributes = vec![
+            ("pool_type", "ReClammPoolFactory".as_bytes()),
+            ("fee", &fee_bytes),
+            ("manual_updates", &[1u8]),
+            ("initial_min_price", &initial_min_price_bytes),
+            ("initial_max_price", &initial_max_price_bytes),
+            ("initial_target_price", &initial_target_price_bytes),
+            ("daily_price_shift_exponent", &daily_price_shift_exponent_bytes),
+            ("centeredness_margin", &centeredness_margin_bytes),
+            ("token_a_price_includes_rate", &token_a_price_includes_rate_bytes),
+            ("token_b_price_includes_rate", &token_b_price_includes_rate_bytes),
+        ];
+
+        if !rate_providers.is_empty() {
+            attributes.push(("rate_providers", &rate_providers_bytes));
+        }
+
+        return Some(create_pool_component(&pool, tokens.as_slice(), &attributes, config));
+    }
+
+    None
 }
 
 fn create_pool_component(
     pool: &[u8],
     tokens: &[Vec<u8>],
     attributes: &[(&str, &[u8])],
+    config: &DeploymentConfig,
 ) -> ProtocolComponent {
     ProtocolComponent::new(&address_id(pool))
-        .with_contracts(&[pool.to_vec(), VAULT_ADDRESS.to_vec()])
+        .with_contracts(&[pool.to_vec(), config.vault.clone()])
         .with_tokens(tokens)
         .with_attributes(attributes)
         .as_swap_type("balancer_v3_pool", ImplementationType::Vm)
