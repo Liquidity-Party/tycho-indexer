@@ -25,6 +25,10 @@ Contract addresses are configured per manifest via query-string params on map/st
 - `weighted_factory` — Weighted pool factory
 - `stable_factory` — Stable pool factory
 - `reclamm_factory` — ReClamm pool factory
+- `skip_rate_provider_pools` — When `true`, pools whose factory `Create` call includes any
+  `WITH_RATE` token are not emitted as protocol components (optional, default `false`). Set to
+  `true` on L2 deployments where RPC nodes lack DCI/tracing support; yield-bearing pools with rate
+  providers will not be indexed.
 
 See `substreams.yaml` (Ethereum mainnet) and the network-specific manifests:
 

@@ -35,6 +35,10 @@ fn collect_rate_providers(tokens: &TokenConfig) -> Vec<Vec<u8>> {
         .collect::<Vec<_>>()
 }
 
+fn should_skip_rate_provider_pool(config: &DeploymentConfig, rate_providers: &[Vec<u8>]) -> bool {
+    config.skip_rate_provider_pools && !rate_providers.is_empty()
+}
+
 pub fn address_map(
     pool_factory_address: &[u8],
     log: &Log,
@@ -50,6 +54,9 @@ pub fn address_map(
         } = WeightedPoolCreate::match_and_decode(call)?;
         let WeightedPoolCreated { pool } = WeightedPoolCreated::match_and_decode(log)?;
         let rate_providers = collect_rate_providers(&token_config);
+        if should_skip_rate_provider_pool(config, &rate_providers) {
+            return None;
+        }
 
         // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
         // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
@@ -83,6 +90,9 @@ pub fn address_map(
             StablePoolCreate::match_and_decode(call)?;
         let StablePoolCreated { pool } = StablePoolCreated::match_and_decode(log)?;
         let rate_providers = collect_rate_providers(&token_config);
+        if should_skip_rate_provider_pool(config, &rate_providers) {
+            return None;
+        }
 
         // TODO: to add "buffers" support for boosted pools, we need to add the unwrapped
         // version of all ERC4626 tokens to the pool tokens list. Skipped for now - we need
@@ -121,6 +131,9 @@ pub fn address_map(
         } = ReClammPoolCreate::match_and_decode(call)?;
         let ReClammPoolCreated { pool } = ReClammPoolCreated::match_and_decode(log)?;
         let rate_providers = collect_rate_providers(&token_config);
+        if should_skip_rate_provider_pool(config, &rate_providers) {
+            return None;
+        }
 
         let tokens = token_config
             .iter()
@@ -171,4 +184,44 @@ fn create_pool_component(
         .with_tokens(tokens)
         .with_attributes(attributes)
         .as_swap_type("balancer_v3_pool", ImplementationType::Vm)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::params::DeploymentConfig;
+
+    fn sample_config(skip_rate_provider_pools: bool) -> DeploymentConfig {
+        DeploymentConfig::parse(&format!(
+            "vault=ba1333333333a1ba1108e8412f11850a5c319ba9\
+             &vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9\
+             &batch_router=136f1efcc3f8f88516b9e94110d56fdbfb1778d1\
+             &permit2=000000000022d473030f116ddee9f6b43ac78ba3\
+             &weighted_factory=201efd508c8dfe9de1a13c2452863a78cb2a86cc\
+             &stable_factory=b9d01ca61b9c181da1051bfdd28e1097e920ab14\
+             &reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff\
+             &skip_rate_provider_pools={skip_rate_provider_pools}"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn should_skip_when_flag_set_and_rate_providers_present() {
+        let config = sample_config(true);
+        let rate_providers = vec![vec![0u8; 20]];
+        assert!(should_skip_rate_provider_pool(&config, &rate_providers));
+    }
+
+    #[test]
+    fn should_not_skip_when_flag_unset() {
+        let config = sample_config(false);
+        let rate_providers = vec![vec![0u8; 20]];
+        assert!(!should_skip_rate_provider_pool(&config, &rate_providers));
+    }
+
+    #[test]
+    fn should_not_skip_when_rate_providers_empty() {
+        let config = sample_config(true);
+        assert!(!should_skip_rate_provider_pool(&config, &[]));
+    }
 }

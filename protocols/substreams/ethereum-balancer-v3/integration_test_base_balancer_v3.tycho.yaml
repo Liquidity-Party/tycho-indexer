@@ -27,3 +27,10 @@ tests:
           pool_type: "0x5765696768746564506f6f6c466163746f7279"
         skip_simulation: true
         creation_tx: "0xe62361b12a708c5752c1f4c9aeae7bae4f884eb2a480d2ee9ccfc69adc659112"
+
+  - name: test_base_stable_pool_rate_provider_skipped
+    start_block: 29507270
+    stop_block: 29507285
+    excluded_components:
+      - "0xb7b8b3afc010169779c5c2385ec0eb0477fe3347"
+    expected_components: []
