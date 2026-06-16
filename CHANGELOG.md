@@ -1,3 +1,11 @@
+## [0.312.1](https://github.com/propeller-heads/tycho/compare/0.312.0...0.312.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* **safe_math:** use exact u64::isqrt in sqrt_u256 base case ([02d4e82](https://github.com/propeller-heads/tycho/commit/02d4e8200bd6b86ef0013e47e1f48d687cddb157))
+* **safe_math:** use exact u64::isqrt in sqrt_u256 base case ([#1093](https://github.com/propeller-heads/tycho/issues/1093)) ([f3f3d9c](https://github.com/propeller-heads/tycho/commit/f3f3d9c0f3cec90b277f7902929c9ada265f8ddb))
+
 ## [0.312.0](https://github.com/propeller-heads/tycho/compare/0.311.0...0.312.0) (2026-06-16)
 
 
