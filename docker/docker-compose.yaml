@@ -68,7 +68,7 @@ services:
       - "4242:4242"
     volumes:
       - ./wait-for-postgres.sh:/usr/wait-for-postgres.sh
-      - ./extractors.yaml:/opt/tycho-indexer/extractors.yaml
+      - ../crates/tycho-indexer/extractors.yaml:/opt/tycho-indexer/extractors.yaml
       - ./substreams/:/opt/tycho-indexer/substreams/
     # Configure logging driver for better log collection
     logging:
@@ -81,7 +81,7 @@ services:
       - "service=tycho-indexer"
       - "version=0.76.0"
     entrypoint: [ "/usr/wait-for-postgres.sh", "db" ]
-    command: [ "/opt/tycho-indexer/tycho-indexer", "--endpoint", "https://mainnet.eth.streamingfast.io:443", "index", "--retention-horizon", "2025-07-23T00:00:00"]
+    command: [ "/opt/tycho-indexer/tycho-indexer", "--endpoint", "https://mainnet.eth.streamingfast.io:443", "index", "--retention-horizon", "2099-07-23T00:00:00"]
 
 volumes:
   postgres_data:

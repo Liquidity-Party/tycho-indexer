@@ -22,12 +22,21 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   test-runner:
+    build:
+      # Build context is the repo root: run.Dockerfile does `COPY . .` and needs the whole
+      # workspace (crates/, proto/, protocols/). BuildKit honors run.Dockerfile.dockerignore.
+      context: ../../
+      dockerfile: protocols/testing/run.Dockerfile
+      args:
+        PROTOCOLS: "${PROTOCOLS}"
     image: protocol-testing-test-runner:latest
     depends_on:
       db:
         condition: service_healthy
     environment:
       RUST_LOG: "${RUST_LOG:-protocol_testing=info}"
+      # Test mode: "range" (default) or "full" (continuous sync to chain tip, runs indefinitely).
+      MODE: "${MODE:-range}"
       DATABASE_URL: postgres://postgres:mypassword@db:5432/tycho_indexer_0
       RPC_URL: "${RPC_URL}"
       BASE_RPC_URL: "${BASE_RPC_URL:-}"
