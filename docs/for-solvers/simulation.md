@@ -197,6 +197,8 @@ let mut protocol_stream = ProtocolStreamBuilder::new("tycho-beta.propellerheads.
 
 Some protocols, such as Balancer V2 and Curve, require a pool filter to be defined to filter out unsupported pools. If a protocol needs a pool filter and the user does not provide one, a warning will be raised during the stream setup process.
 
+`ProtocolStreamBuilder` applies a curated blocklist of pools that are known to break simulation (for example, rebasing-token and insolvent pools) by default, so the stream excludes them automatically. To exclude additional components, pass their IDs to `blocklist_components(...)`.
+
 The stream created emits `Update` messages which consist of:
 
 * `block number_or_timestamp`- the block this update message refers to

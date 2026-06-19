@@ -1,4 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 use alloy::{
     primitives::{map::AddressHashMap, Address, U256},
@@ -77,6 +80,17 @@ pub async fn simulate_swap_transaction(
             None
         };
 
+    let fermiswap_pairs = collect_fermiswap_pairs(&execution_info).map_err(|e| (e, None, None))?;
+    let fermiswap_overwrites = if fermiswap_pairs.is_empty() {
+        None
+    } else {
+        Some(
+            encoding::setup_fermiswap_overwrites(rpc_tools, block, &fermiswap_pairs)
+                .await
+                .map_err(|e| (e, None, None))?,
+        )
+    };
+
     for (simulation_id, info) in &execution_info {
         let request = match encoding::swap_request(&info.transaction, block) {
             Ok(request) => request,
@@ -113,6 +127,9 @@ pub async fn simulate_swap_transaction(
         };
         if let Some(ref router_overwrites) = router_overwrites {
             state_overwrites.extend(router_overwrites.clone());
+        }
+        if let Some(ref fermiswap_overwrites) = fermiswap_overwrites {
+            state_overwrites.extend(fermiswap_overwrites.clone());
         }
 
         // Add protocol-specific overwrites for Angstrom hooks
@@ -230,4 +247,35 @@ pub async fn simulate_swap_transaction(
     }
 
     Ok(tycho_execution_results)
+}
+
+fn collect_fermiswap_pairs(
+    execution_info: &HashMap<String, TychoExecutionInput>,
+) -> miette::Result<Vec<(Address, Address)>> {
+    let mut pairs = HashSet::new();
+
+    for info in execution_info.values() {
+        for swap in info.solution.swaps() {
+            let component = swap.component();
+            if component.protocol_system != "vm:fermiswap" {
+                continue;
+            }
+
+            if component.tokens.len() < 2 {
+                return Err(miette!(
+                    "FermiSwap component {:?} has {} tokens; expected at least 2",
+                    component.id,
+                    component.tokens.len()
+                ));
+            }
+
+            let base_asset = bytes_to_address(&component.tokens[0])
+                .map_err(|e| miette!("Invalid FermiSwap base asset address: {e}"))?;
+            let quote_asset = bytes_to_address(&component.tokens[1])
+                .map_err(|e| miette!("Invalid FermiSwap quote asset address: {e}"))?;
+            pairs.insert((base_asset, quote_asset));
+        }
+    }
+
+    Ok(pairs.into_iter().collect())
 }

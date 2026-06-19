@@ -66,7 +66,6 @@
 //! use futures::StreamExt;
 //! use tycho_client::feed::component_tracker::ComponentFilter;
 //! use tycho_simulation::evm::protocol::uniswap_v2::state::UniswapV2State;
-//! use std::collections::HashSet;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -89,7 +88,6 @@
 //!             .exchange::<UniswapV2State>(
 //!                 "uniswap_v2", ComponentFilter::with_tvl_range(5.0, 10.0), None
 //!             )
-//!             .blocklist_components(HashSet::new())
 //!             .set_tokens(all_tokens)
 //!             .await
 //!             .build()
@@ -139,6 +137,7 @@ use crate::{
         errors::InvalidSnapshotError,
         models::{DecoderContext, TryFromWithBlock, Update},
     },
+    utils::default_blocklist,
 };
 
 const EXCHANGES_REQUIRING_FILTER: [&str; 2] = ["vm:balancer_v2", "vm:curve"];
@@ -240,11 +239,16 @@ pub struct ProtocolStreamBuilder {
 impl ProtocolStreamBuilder {
     /// Creates a new builder for a multi-protocol stream.
     ///
+    /// The shipped pool blocklist is applied by default, excluding components known to break
+    /// simulation. Use [`blocklist_components`](Self::blocklist_components) to exclude additional
+    /// components.
+    ///
     /// See the [module-level docs](self) for full details on stream behavior and configuration.
     pub fn new(tycho_url: &str, chain: Chain) -> Self {
         Self {
             decoder: TychoStreamDecoder::new(),
-            stream_builder: TychoStreamBuilder::new(tycho_url, chain),
+            stream_builder: TychoStreamBuilder::new(tycho_url, chain)
+                .blocklisted_ids(default_blocklist()),
             stream_end_policy: StreamEndPolicy::default(),
             chain,
             pending_indexers: HashMap::new(),
@@ -443,7 +447,10 @@ impl ProtocolStreamBuilder {
         self
     }
 
-    /// Exclude specific component IDs from all registered exchanges.
+    /// Exclude additional component IDs from all registered exchanges.
+    ///
+    /// These IDs are added to the shipped blocklist that is already applied by default (see
+    /// [`new`](Self::new)).
     pub fn blocklist_components(mut self, ids: HashSet<String>) -> Self {
         if !ids.is_empty() {
             tracing::info!("Blocklisting {} components", ids.len());

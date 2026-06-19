@@ -59,7 +59,7 @@ use tycho_simulation::{
     protocol::models::{ProtocolComponent, Update},
     tycho_client::feed::component_tracker::ComponentFilter,
     tycho_common::{dto::TvlThresholdTier, models::Chain},
-    utils::{get_default_url, load_all_tokens, load_blocklist},
+    utils::{get_default_url, load_all_tokens},
 };
 
 /// Represents a transaction to be executed.
@@ -84,9 +84,6 @@ struct Cli {
     tvl_threshold: Option<f64>,
     #[arg(long, default_value = "ethereum")]
     chain: Chain,
-    /// Path to blocklist TOML config file
-    #[arg(long)]
-    blocklist_file: Option<std::path::PathBuf>,
 }
 
 impl Cli {
@@ -247,10 +244,6 @@ async fn main() {
         }
         _ => {}
     }
-
-    let blocklist =
-        load_blocklist(cli.blocklist_file.as_deref()).expect("Failed to load blocklist");
-    protocol_stream = protocol_stream.blocklist_components(blocklist);
 
     let protocol_stream = protocol_stream
         .auth_key(Some(tycho_api_key.clone()))

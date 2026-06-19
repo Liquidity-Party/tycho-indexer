@@ -1,3 +1,19 @@
+## [0.314.1](https://github.com/propeller-heads/tycho/compare/0.314.0...0.314.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **tycho-simulation:** Apply pool blocklist by default ([a14caa7](https://github.com/propeller-heads/tycho/commit/a14caa7d42ca47f2a6d1a046ea16ce12a00c331b))
+* **tycho-simulation:** Apply pool blocklist by default ([#1104](https://github.com/propeller-heads/tycho/issues/1104)) ([8b9f548](https://github.com/propeller-heads/tycho/commit/8b9f54847e3a195e67a74232890badff82cb562b))
+
+## [0.314.0](https://github.com/propeller-heads/tycho/compare/0.313.1...0.314.0) (2026-06-18)
+
+
+### Features
+
+* add Fermiswap registry timestamp overwrites ([e684d1c](https://github.com/propeller-heads/tycho/commit/e684d1c2f3dbdb7a3a4bdb6c77eaacedc778b007))
+* add Fermiswap registry timestamp overwrites ([#1101](https://github.com/propeller-heads/tycho/issues/1101)) ([52003f0](https://github.com/propeller-heads/tycho/commit/52003f0a3dfd78a9d6eed4e08633fa663d683655))
+
 ## [0.313.1](https://github.com/propeller-heads/tycho/compare/0.313.0...0.313.1) (2026-06-17)
 
 
