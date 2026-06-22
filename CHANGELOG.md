@@ -1,3 +1,18 @@
+## [0.315.0](https://github.com/propeller-heads/tycho/compare/0.314.1...0.315.0) (2026-06-22)
+
+
+### Features
+
+* Cap integration-test swap inputs using token prices ([a153a6f](https://github.com/propeller-heads/tycho/commit/a153a6fbc6d99bf1ecbefc64de625cf76d5c389e))
+* Cap integration-test swap inputs using token prices ([#1103](https://github.com/propeller-heads/tycho/issues/1103)) ([7684ce4](https://github.com/propeller-heads/tycho/commit/7684ce4635ad30935356bd5fc963d0d9a06c32ef))
+* **integration-test:** Add number of pools per protocol metric ([d7070a1](https://github.com/propeller-heads/tycho/commit/d7070a1bfb3f5b2d60f9b32cb0de2d186e42b663))
+* **integration-test:** Add number of pools per protocol metric ([#1105](https://github.com/propeller-heads/tycho/issues/1105)) ([20489b2](https://github.com/propeller-heads/tycho/commit/20489b2c9fdb97e240a916492bf678ee6c07b153))
+
+
+### Bug Fixes
+
+* **integration-test:** Change TOKEN_PRICE_REFRESH_INTERVAL to 24h ([45ed1b2](https://github.com/propeller-heads/tycho/commit/45ed1b270c4927c8763f57ad86036b8f1e64eed4))
+
 ## [0.314.1](https://github.com/propeller-heads/tycho/compare/0.314.0...0.314.1) (2026-06-19)
 
 
