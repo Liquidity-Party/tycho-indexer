@@ -1,3 +1,26 @@
+## [0.317.0](https://github.com/propeller-heads/tycho/compare/0.316.0...0.317.0) (2026-06-23)
+
+
+### Features
+
+* add lunarbase executor ([a26c697](https://github.com/propeller-heads/tycho/commit/a26c69777907c0da5cfa9ed75926eef3c1bc94f5))
+* add lunarbase to integration test ([eae621d](https://github.com/propeller-heads/tycho/commit/eae621d8eb9df1cbb4a80535112acf488553f396))
+* add lunarbase to integration test ([#1092](https://github.com/propeller-heads/tycho/issues/1092)) ([65ed276](https://github.com/propeller-heads/tycho/commit/65ed2766902453a9ef8b28078f2cd3c9cb6e58ac))
+
+## [0.316.0](https://github.com/propeller-heads/tycho/compare/0.315.0...0.316.0) (2026-06-23)
+
+
+### Features
+
+* **fee-calculator:** Use tx.origin for custom fee when client is zero ([19c6dd6](https://github.com/propeller-heads/tycho/commit/19c6dd6586fefdcbf0f5b8acfce7f903230516cf))
+* **fee-calculator:** Use tx.origin for custom fee when client is zero ([#1086](https://github.com/propeller-heads/tycho/issues/1086)) ([121f729](https://github.com/propeller-heads/tycho/commit/121f72962a42b1337c80704b8269e3f8aa95b4ef))
+
+
+### Bug Fixes
+
+* **deps:** bump quinn-proto to 0.11.15 for RUSTSEC-2026-0185 ([c644f10](https://github.com/propeller-heads/tycho/commit/c644f10e33a80f5aa3f36e33f1ea2b6dc2e33ae0))
+* **deps:** bump quinn-proto to 0.11.15 for RUSTSEC-2026-0185 ([#1107](https://github.com/propeller-heads/tycho/issues/1107)) ([ab8fda5](https://github.com/propeller-heads/tycho/commit/ab8fda55ebeab37c2e8e865b1987fef2bd62a9ab))
+
 ## [0.315.0](https://github.com/propeller-heads/tycho/compare/0.314.1...0.315.0) (2026-06-22)
 
 

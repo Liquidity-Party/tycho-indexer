@@ -110,6 +110,8 @@ const executors_to_deploy = {
         {
             exchange: "NativeWrapExecutor", args: ["0x4200000000000000000000000000000000000006"]
         },
+        // LunarBaseExecutor - Args: (none)
+        {exchange: "LunarBaseExecutor", args: []},
     ],
     "unichain": [
         // USV2 - Args: Fee BPS
