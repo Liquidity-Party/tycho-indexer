@@ -1,3 +1,29 @@
+## [0.317.3](https://github.com/propeller-heads/tycho/compare/0.317.2...0.317.3) (2026-06-23)
+
+
+### Bug Fixes
+
+* **ci:** gate remaining pull_request_target fork runs ([5c44c1c](https://github.com/propeller-heads/tycho/commit/5c44c1c6b9eae30f2963f09f22edac3d910d14cd))
+* **ci:** gate remaining pull_request_target fork runs ([#1111](https://github.com/propeller-heads/tycho/issues/1111)) ([223424f](https://github.com/propeller-heads/tycho/commit/223424f6d28589f92d2ae1401bdfa1dfc28f73d0))
+
+## [0.317.2](https://github.com/propeller-heads/tycho/compare/0.317.1...0.317.2) (2026-06-23)
+
+
+### Bug Fixes
+
+* **ci:** close pull_request_target injection and gate fork runs ([29b55a7](https://github.com/propeller-heads/tycho/commit/29b55a79c1a2a2817e5e898bc24d6112f7f6c842))
+* **ci:** close pull_request_target injection and gate fork runs ([#1109](https://github.com/propeller-heads/tycho/issues/1109)) ([868ea0b](https://github.com/propeller-heads/tycho/commit/868ea0bc75504be0c5a4b634d61db76f0d54608e))
+
+## [0.317.1](https://github.com/propeller-heads/tycho/compare/0.317.0...0.317.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* add explicit comments for clippy allow ([d79f5a4](https://github.com/propeller-heads/tycho/commit/d79f5a480bacdabde3821a049fcdf994ef85821f))
+* address clippy for private interface ([7c864a0](https://github.com/propeller-heads/tycho/commit/7c864a0756cb51062fe7ab8f5543c68eea4ffbed))
+* fix cargo audit ([#1108](https://github.com/propeller-heads/tycho/issues/1108)) ([8acd319](https://github.com/propeller-heads/tycho/commit/8acd31995d5a632d680127d81033e61d05076ade))
+* update dependency with vulnerability ([b524d7a](https://github.com/propeller-heads/tycho/commit/b524d7a964f4e3b1ffc45d99c4cff64abff4fe2b))
+
 ## [0.317.0](https://github.com/propeller-heads/tycho/compare/0.316.0...0.317.0) (2026-06-23)
 
 

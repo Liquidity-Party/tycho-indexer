@@ -52,6 +52,9 @@ jobs:
     if: needs.changes.outputs.foundry == 'true' || github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # forge test runs fork-controlled Solidity (and can shell out via ffi) with
+    # RPC secrets in scope; gate fork PRs behind required-reviewer approval.
+    environment: ${{ github.event.pull_request.head.repo.fork && 'integration-tests' || '' }}
     strategy:
       matrix:
         project:
@@ -128,6 +131,8 @@ jobs:
     if: needs.changes.outputs.foundry == 'true' || github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # No secrets here, but it compiles fork code; gate for consistency.
+    environment: ${{ github.event.pull_request.head.repo.fork && 'integration-tests' || '' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:

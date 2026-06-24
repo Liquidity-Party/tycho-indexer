@@ -1212,6 +1212,8 @@ pub trait RPCClient: Send + Sync {
             .map(|pages| pages.into_iter().flatten().collect())
     }
 
+    // clippy false positive: `'a` is required by the trait method signature and is
+    // used in `SnapshotParameters<'a>`, but `async_trait` makes Clippy miss it.
     #[allow(clippy::extra_unused_lifetimes)]
     async fn get_snapshots<'a>(
         &self,
@@ -1816,7 +1818,6 @@ impl RPCClient for HttpRPCClient {
         ))
     }
 
-    #[allow(clippy::extra_unused_lifetimes)]
     async fn get_snapshots<'a>(
         &self,
         request: &SnapshotParameters<'a>,

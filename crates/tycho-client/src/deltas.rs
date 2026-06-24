@@ -253,7 +253,6 @@ impl Inner {
     }
 
     /// Registers a new pending subscription.
-    #[allow(clippy::result_large_err)]
     fn new_subscription(
         &mut self,
         id: &ExtractorIdentity,
@@ -304,7 +303,6 @@ impl Inner {
     }
 
     /// Sends a message to a subscription's receiver.
-    #[allow(clippy::result_large_err)]
     fn send(&mut self, id: &Uuid, msg: BlockAggregatedChanges) -> Result<(), DeltasError> {
         if let Some(sender) = self.sender.get_mut(id) {
             sender
@@ -406,7 +404,6 @@ impl Inner {
 /// Tycho client websocket implementation.
 impl WsDeltasClient {
     // Construct a new client with 5 reconnection attempts.
-    #[allow(clippy::result_large_err)]
     pub fn new(ws_uri: &str, auth_key: Option<&str>) -> Result<Self, DeltasError> {
         let uri = ws_uri
             .parse::<Uri>()
@@ -425,7 +422,6 @@ impl WsDeltasClient {
     }
 
     // Construct a new client with a custom number of reconnection attempts.
-    #[allow(clippy::result_large_err)]
     pub fn new_with_reconnects(
         ws_uri: &str,
         auth_key: Option<&str>,
@@ -451,7 +447,6 @@ impl WsDeltasClient {
 
     // Construct a new client with custom buffer sizes (for testing)
     #[cfg(test)]
-    #[allow(clippy::result_large_err)]
     pub fn new_with_custom_buffers(
         ws_uri: &str,
         auth_key: Option<&str>,
