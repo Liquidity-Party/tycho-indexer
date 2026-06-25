@@ -6,6 +6,7 @@ pub mod token;
 
 use std::{collections::HashMap, fmt::Display, str::FromStr};
 
+pub use blockchain::{BlockChanges, TxWithContractChanges};
 use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
