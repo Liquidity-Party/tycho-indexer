@@ -1117,7 +1117,7 @@ impl TestRunner {
                     }
 
                     let executors_json = json!({
-                        "ethereum": {
+                        (self.chain.to_string()): {
                             (protocol_system): EXECUTOR_ADDRESS
                         }
                     });
