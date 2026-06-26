@@ -37,12 +37,12 @@ The following exchanges are integrated with the VM approach:
 2.  Clone the Tycho monorepo:
 
     ```bash
-    git clone https://github.com/propeller-heads/tycho-indexer
+    git clone https://github.com/propeller-heads/tycho
     ```
 3.  Install dependencies:
 
     ```bash
-    cd ./tycho-indexer/protocols/adapter-integration/evm/
+    cd ./tycho/protocols/adapter-integration/evm/
     forge install
     ```
 
