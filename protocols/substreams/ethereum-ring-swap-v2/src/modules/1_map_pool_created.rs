@@ -196,7 +196,8 @@ struct RingTokens {
 /// Ring pairs hold FewTokens (wrapped ERC-20s), but components are exposed to solvers with the
 /// underlying ERC-20s as tokens. Metadata is fetched with two batched eth_calls: one against both
 /// pair tokens (token() + decimals()), and one against FewFactory plus the resolved underlying
-/// tokens. Returns None when the pair tokens are not official FewFactory wrappers or any call fails.
+/// tokens. Returns None when the pair tokens are not official FewFactory wrappers or any call
+/// fails.
 fn resolve_ring_tokens(event: &PairCreated, few_factory_address: Address) -> Option<RingTokens> {
     let fw_responses = RpcBatch::new()
         .add(few_wrapped_token::functions::Token {}, event.token0.clone())

@@ -8,10 +8,9 @@ use crate::encoding::{
         constants::{DEFAULT_EXECUTORS_JSON, PROTOCOL_SPECIFIC_CONFIG},
         swap_encoder::{
             aerodrome_v1::AerodromeV1SwapEncoder, balancer_v2::BalancerV2SwapEncoder,
-            balancer_v3::BalancerV3SwapEncoder, bebop::BebopSwapEncoder,
-            bopamm::BopAMMSwapEncoder, curve::CurveSwapEncoder, ekubo::EkuboSwapEncoder,
-            ekubo_v3::EkuboV3SwapEncoder, erc_4626::ERC4626SwapEncoder,
-            etherfi::EtherfiSwapEncoder, fermiswap::FermiSwapEncoder,
+            balancer_v3::BalancerV3SwapEncoder, bebop::BebopSwapEncoder, bopamm::BopAMMSwapEncoder,
+            curve::CurveSwapEncoder, ekubo::EkuboSwapEncoder, ekubo_v3::EkuboV3SwapEncoder,
+            erc_4626::ERC4626SwapEncoder, etherfi::EtherfiSwapEncoder, fermiswap::FermiSwapEncoder,
             fluid_v1::FluidV1SwapEncoder, hashflow::HashflowSwapEncoder,
             liquidity_party::LiquidityPartySwapEncoder, liquorice::LiquoriceSwapEncoder,
             lunarbase::LunarBaseSwapEncoder, maverick_v2::MaverickV2SwapEncoder,
