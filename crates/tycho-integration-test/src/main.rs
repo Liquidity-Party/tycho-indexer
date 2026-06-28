@@ -1,3 +1,4 @@
+mod fee_fetcher;
 mod metrics;
 mod statistics;
 mod stream_processor;
@@ -28,6 +29,7 @@ use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tycho_client::feed::SynchronizerState;
 use tycho_common::{simulation::protocol_sim::ProtocolSim, Bytes};
+use tycho_execution::encoding::evm::get_router_address;
 use tycho_simulation::{
     evm::protocol::cowamm::constants::PROTOCOL_SYSTEM as COWAMM_PROTOCOL_SYSTEM,
     protocol::models::ProtocolComponent,
@@ -49,6 +51,7 @@ use tycho_test::{
 };
 
 use crate::{
+    fee_fetcher::{fetch_router_fee_on_output, RouterFeeOnOutput},
     statistics::TestStatistics,
     stream_processor::{
         protocol_stream_processor::ProtocolStreamProcessor,
@@ -163,10 +166,6 @@ struct Cli {
     /// Seconds without a protocol update before marking all known protocols as stale in metrics.
     #[arg(long, default_value_t = 30)]
     stale_threshold_secs: u64,
-
-    /// Router fee on output in bps (defaults to 10 bps)
-    #[arg(long, default_value_t = 10, value_parser = clap::value_parser!(u16).range(1..))]
-    router_fee: u16,
 
     /// Disable on-chain swap execution validation (RPC simulation only, no swap encoding or
     /// execution). Useful for diagnosing stream latency without execution overhead.
@@ -286,6 +285,20 @@ async fn run(cli: Cli) -> miette::Result<()> {
     let cli = Arc::new(cli);
 
     let rpc_tools = tycho_test::RPCTools::new(&cli.rpc_url, &chain).await?;
+
+    // Read the router fee on output from the on-chain FeeCalculator once at start-up. Slippage is
+    // computed after backing this fee out of the simulated amount out, so a stale or wrong fee
+    // would skew every slippage result.
+    let router_address = get_router_address(&chain)
+        .map_err(|e| miette!("No Tycho router address configured for chain {chain:?}: {e}"))?;
+    let router_fee = fetch_router_fee_on_output(&rpc_tools.provider, router_address)
+        .await
+        .wrap_err("Failed to read router fee on output from the on-chain FeeCalculator")?;
+    info!(
+        numerator = router_fee.numerator(),
+        denominator = router_fee.denominator(),
+        "Loaded router fee on output from on-chain FeeCalculator"
+    );
 
     // Load tokens from Tycho
     info!(%cli.tycho_url, "Loading tokens...");
@@ -491,7 +504,7 @@ async fn run(cli: Cli) -> miette::Result<()> {
                             .into_diagnostic()
                             .wrap_err("Failed to acquire protocol permit")?;
                         tokio::spawn(async move {
-                            if let Err(e) = process_update(cli, chain, rpc_tools, tycho_state, statistics, token_prices, &update).await {
+                            if let Err(e) = process_update(cli, chain, rpc_tools, tycho_state, statistics, token_prices, router_fee, &update).await {
                                 warn!("{}", format_error_chain(&e));
                             }
                             drop(permit);
@@ -528,7 +541,7 @@ async fn run(cli: Cli) -> miette::Result<()> {
                             .into_diagnostic()
                             .wrap_err("Failed to acquire RFQ permit")?;
                         tokio::spawn(async move {
-                            if let Err(e) = process_update(cli, chain, rpc_tools, tycho_state, statistics, token_prices, &update).await {
+                            if let Err(e) = process_update(cli, chain, rpc_tools, tycho_state, statistics, token_prices, router_fee, &update).await {
                                 warn!("{}", format_error_chain(&e));
                             }
                             drop(permit);
@@ -684,6 +697,7 @@ async fn process_update(
     tycho_state: Arc<RwLock<TychoState>>,
     statistics: Option<Arc<RwLock<TestStatistics>>>,
     token_prices: SharedTokenPrices,
+    router_fee: RouterFeeOnOutput,
     update: &StreamUpdate,
 ) -> miette::Result<()> {
     info!(
@@ -1006,7 +1020,7 @@ async fn process_update(
             &mut n_reverts,
             &mut n_failures,
             statistics.clone(),
-            cli.router_fee,
+            router_fee,
         );
 
         // Record statistics
@@ -1417,7 +1431,7 @@ fn process_execution_result(
     n_reverts: &mut i32,
     n_failures: &mut i32,
     statistics: Option<Arc<RwLock<TestStatistics>>>,
-    router_fee: u16,
+    router_fee: RouterFeeOnOutput,
 ) {
     match result {
         TychoExecutionResult::Success {
@@ -1435,12 +1449,13 @@ fn process_execution_result(
 
             metrics::record_simulation_execution_success(&execution_info.protocol_system);
 
-            // Remove the router fee from the expected simulated amount out.
-            let simulated_amount_out_without_fee = execution_info
-                .expected_amount_out
-                .clone() -
-                (execution_info.expected_amount_out * BigUint::from(router_fee)) /
-                    BigUint::from(10000u64);
+            // Remove the router fee from the expected simulated amount out. The on-chain router
+            // deducts this fee from the swap output, so the simulated amount out (which is
+            // fee-free) must be reduced by the same fraction before comparing against the
+            // executed amount.
+            let simulated_amount_out_without_fee = &execution_info.expected_amount_out -
+                (&execution_info.expected_amount_out * BigUint::from(router_fee.numerator())) /
+                    BigUint::from(router_fee.denominator());
 
             // Calculate slippage: positive = simulated > expected, negative = simulated <
             // expected
