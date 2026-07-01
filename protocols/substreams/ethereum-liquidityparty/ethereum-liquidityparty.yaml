@@ -26,7 +26,7 @@ networks:
 modules:
   - name: map_protocol_components
     kind: map
-    initialBlock: 25301753
+    initialBlock: 25301734
     inputs:
       - params: string
       - source: sf.ethereum.type.v2.Block
@@ -35,7 +35,7 @@ modules:
 
   - name: store_protocol_components
     kind: store
-    initialBlock: 25301753
+    initialBlock: 25301734
     updatePolicy: set
     valueType: string
     inputs:
@@ -43,7 +43,7 @@ modules:
 
   - name: map_killed_components
     kind: map
-    initialBlock: 25301753
+    initialBlock: 25301734
     inputs:
       - source: sf.ethereum.type.v2.Block
       - store: store_protocol_components
@@ -52,7 +52,7 @@ modules:
 
   - name: store_killed_components
     kind: store
-    initialBlock: 25301753
+    initialBlock: 25301734
     updatePolicy: set
     valueType: int64
     inputs:
@@ -60,7 +60,7 @@ modules:
 
   - name: map_relative_component_balance
     kind: map
-    initialBlock: 25301753
+    initialBlock: 25301734
     inputs:
       - source: sf.ethereum.type.v2.Block
       - store: store_protocol_components
@@ -70,7 +70,7 @@ modules:
 
   - name: store_balances
     kind: store
-    initialBlock: 25301753
+    initialBlock: 25301734
     updatePolicy: add
     valueType: bigint
     inputs:
@@ -78,7 +78,7 @@ modules:
 
   - name: map_protocol_changes
     kind: map
-    initialBlock: 25301753
+    initialBlock: 25301734
     inputs:
       - params: string
       - source: sf.ethereum.type.v2.Block

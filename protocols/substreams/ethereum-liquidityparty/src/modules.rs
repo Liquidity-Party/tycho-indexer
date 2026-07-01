@@ -4,7 +4,7 @@ use crate::{
     pool_factories,
 };
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use substreams::{pb::substreams::StoreDeltas, prelude::*};
 use substreams_ethereum::{pb::eth, Event};
 use tycho_substreams::{
@@ -295,6 +295,16 @@ fn map_protocol_changes(
                 });
         });
 
+    // Contracts created alongside components in this block (e.g. each pool's immutable BFStore).
+    // These are immutable SSTORE2 data contracts, so capturing their creation code once in the
+    // block they are deployed is sufficient — no cross-block store persistence is needed.
+    let new_component_contracts: HashSet<Vec<u8>> = new_components
+        .tx_components
+        .iter()
+        .flat_map(|tx_pc| tx_pc.components.iter())
+        .flat_map(|c| c.contracts.iter().cloned())
+        .collect();
+
     // Extract and insert any storage changes that happened for any of the components.
     extract_contract_changes_builder(
         &block,
@@ -305,6 +315,7 @@ fn map_protocol_changes(
             components_store
                 .get_last(addr_str)
                 .is_some() ||
+                new_component_contracts.contains(addr) ||
                 addr == params.extra_impl1.as_slice() ||
                 addr == params.extra_impl2.as_slice() ||
                 addr == params.planner.as_slice() ||
