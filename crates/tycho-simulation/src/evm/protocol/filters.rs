@@ -1,6 +1,8 @@
 use tracing::{debug, info};
 use tycho_client::feed::synchronizer::ComponentWithState;
 
+pub use crate::evm::protocol::ekubo_v3::filter_fn as ekubo_v3_extension_filter;
+
 /// Filters out pools that DCI currently fails to find some accounts for
 pub fn balancer_v2_pool_filter(component: &ComponentWithState) -> bool {
     const UNSUPPORTED_COMPONENT_IDS: [&str; 6] = [

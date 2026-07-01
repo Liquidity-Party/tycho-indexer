@@ -60,7 +60,11 @@
       "contract": "FermiSwapExecutor",
       "args": ["0xb1076fE3AB5e28005C7c323Bac5AC06a680d452e"]
     },
-    "vm:liquidityparty": { "contract": "LiquidityPartyExecutor", "args": [] }
+    "vm:liquidityparty": { "contract": "LiquidityPartyExecutor", "args": [] },
+    "vm:bopamm": {
+      "contract": "BopAMMExecutor",
+      "args": ["0xdB13ad0fcD134E9c48f2fDaEa8f6751a0F5349ca"]
+    }
   },
   "base": {
     "uniswap_v2": { "contract": "UniswapV2Executor", "args": [30] },
@@ -82,7 +86,11 @@
       "contract": "NativeWrapExecutor",
       "args": ["0x4200000000000000000000000000000000000006"]
     },
-    "lunarbase": { "contract": "LunarBaseExecutor", "args": [] }
+    "lunarbase": { "contract": "LunarBaseExecutor", "args": [] },
+    "rfq:metric": {
+      "contract": "MetricExecutor",
+      "args": ["0x681E908B8ab57c49C74D770F369754CCC3E1ae09"]
+    }
   },
   "unichain": {
     "uniswap_v2": { "contract": "UniswapV2Executor", "args": [30] },

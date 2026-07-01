@@ -140,7 +140,7 @@ use crate::{
     utils::default_blocklist,
 };
 
-const EXCHANGES_REQUIRING_FILTER: [&str; 2] = ["vm:balancer_v2", "vm:curve"];
+const EXCHANGES_REQUIRING_FILTER: [&str; 4] = ["vm:balancer_v2", "fluid_v1", "erc4626", "ekubo_v3"];
 
 #[derive(Default, Debug, Clone, Copy)]
 pub enum StreamEndPolicy {

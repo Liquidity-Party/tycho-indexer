@@ -16,8 +16,8 @@ use tycho_simulation::{
         protocol::{
             aerodrome_slipstreams::state::AerodromeSlipstreamsState,
             ekubo::state::EkuboState,
-            ekubo_v3::{self, state::EkuboV3State},
-            filters::balancer_v2_pool_filter,
+            ekubo_v3::state::EkuboV3State,
+            filters::{balancer_v2_pool_filter, ekubo_v3_extension_filter},
             pancakeswap_v2::state::PancakeswapV2State,
             uniswap_v2::state::UniswapV2State,
             uniswap_v3::state::UniswapV3State,
@@ -61,7 +61,11 @@ fn register_exchanges(
                 )
                 .exchange::<EVMPoolState<PreCachedDB>>("vm:curve", tvl_filter.clone(), None)
                 .exchange::<EkuboState>("ekubo_v2", tvl_filter.clone(), None)
-                .exchange::<EkuboV3State>("ekubo_v3", tvl_filter.clone(), Some(ekubo_v3::filter_fn))
+                .exchange::<EkuboV3State>(
+                    "ekubo_v3",
+                    tvl_filter.clone(),
+                    Some(ekubo_v3_extension_filter),
+                )
                 .exchange::<UniswapV4State>("uniswap_v4", tvl_filter.clone(), None)
                 .exchange::<EVMPoolState<PreCachedDB>>("vm:maverick_v2", tvl_filter.clone(), None);
         }

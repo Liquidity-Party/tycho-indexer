@@ -18,11 +18,11 @@ use tycho_simulation::{
             aerodrome_v1::state::AerodromeV1State,
             cowamm::state::CowAMMState,
             ekubo::state::EkuboState,
-            ekubo_v3::{self, state::EkuboV3State},
+            ekubo_v3::state::EkuboV3State,
             erc4626::state::ERC4626State,
             filters::{
-                balancer_v2_pool_filter, erc4626_filter, fluid_v1_paused_pools_filter,
-                liquidityparty_killed_pools_filter,
+                balancer_v2_pool_filter, ekubo_v3_extension_filter, erc4626_filter,
+                fluid_v1_paused_pools_filter, liquidityparty_killed_pools_filter,
             },
             fluid::FluidV1,
             lunarbase::LunarBaseTychoState,
@@ -288,7 +288,7 @@ impl ProtocolStreamProcessor {
                 stream = stream.exchange::<EkuboV3State>(
                     "ekubo_v3",
                     tvl_filter.clone(),
-                    Some(ekubo_v3::filter_fn),
+                    Some(ekubo_v3_extension_filter),
                 );
             }
             "vm:curve" => {

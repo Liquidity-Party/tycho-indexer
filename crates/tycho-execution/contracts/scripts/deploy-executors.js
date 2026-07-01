@@ -28,6 +28,7 @@ const deploy_protocols = {
         "native_wrapper",
         "rfq:liquorice",
         "vm:fermiswap",
+        "vm:bopamm",
     ],
     "base": [
         "uniswap_v2",
@@ -38,6 +39,7 @@ const deploy_protocols = {
         "aerodrome_v1",
         "native_wrapper",
         "lunarbase",
+        "rfq:metric",
     ],
     "unichain": [
         "uniswap_v2",
