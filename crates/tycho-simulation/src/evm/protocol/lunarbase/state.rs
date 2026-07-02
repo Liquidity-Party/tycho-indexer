@@ -21,7 +21,7 @@ pub type Address = [u8; 20];
 const DEFAULT_GAS: u64 = 180_000;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct LunarBaseTychoState {
+pub struct LunarBaseState {
     pub pool: Address,
     pub token_x: Address,
     pub token_y: Address,
@@ -37,7 +37,7 @@ pub struct LunarBaseTychoState {
     pub head_block: u64,
 }
 
-impl LunarBaseTychoState {
+impl LunarBaseState {
     pub fn pool_params(&self) -> PoolParams {
         PoolParams {
             sqrt_price_x96: self.anchor_price_x96,
@@ -129,7 +129,7 @@ impl LunarBaseTychoState {
 }
 
 #[typetag::serde]
-impl ProtocolSim for LunarBaseTychoState {
+impl ProtocolSim for LunarBaseState {
     fn fee(&self) -> f64 {
         0.0
     }
@@ -288,7 +288,7 @@ fn soft_limit(reserve_in: u128) -> BigUint {
 }
 
 fn quote_limit(
-    state: &LunarBaseTychoState,
+    state: &LunarBaseState,
     token_in: Address,
     token_out: Address,
     mut amount_in: BigUint,
@@ -360,8 +360,8 @@ mod tests {
         )
     }
 
-    fn state() -> LunarBaseTychoState {
-        LunarBaseTychoState {
+    fn state() -> LunarBaseState {
+        LunarBaseState {
             pool: addr(9),
             token_x: addr(1),
             token_y: addr(2),
@@ -404,7 +404,7 @@ mod tests {
         let next_state = quote
             .new_state
             .as_any()
-            .downcast_ref::<LunarBaseTychoState>()
+            .downcast_ref::<LunarBaseState>()
             .unwrap();
 
         assert_eq!(quote.amount, BigUint::ZERO);

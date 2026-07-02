@@ -18,6 +18,7 @@ Currently, Tycho supports the following protocols:
 <tr><td><code>ekubo_v3</code></td><td>Native (<code>EkuboV3State</code>)</td><td>9μs</td><td>Ethereum</td><td>Some extensions are unsupported. Use <code>ekubo_v3_extension_filter</code>.</td></tr>
 <tr><td><code>vm:maverick_v2</code></td><td>VM (<code>EVMPoolState</code>)</td><td>-</td><td>Ethereum</td><td></td></tr>
 <tr><td><code>aerodrome_slipstreams</code></td><td><p>Native</p><p>(<code>AerodromeSlipstreamsState</code>)</p></td><td>-</td><td>Base</td><td></td></tr>
+<tr><td><code>lunarbase</code></td><td>Native (<code>LunarBaseState</code>)</td><td>7 μs (0.007 ms)</td><td>Base</td><td></td></tr>
 <tr><td><code>rocketpool</code></td><td>Native (<code>RocketpoolState</code>)</td><td>-</td><td>Ethereum</td><td>Note: the DepositPool was recently updated to v1.4. This new version is supported by tycho_simulation <a href="https://github.com/propeller-heads/tycho-simulation/releases/tag/0.248.0" target="_blank" rel="noopener noreferrer">> v0.248.0</a> and above.</td></tr>
 <tr><td><code>fluid_v1</code></td><td>Native (<code>FluidV1</code>)</td><td>-</td><td>Ethereum</td><td>Note: paused pools are still indexed. To filter them out use <code>fluid_v1_paused_pools_filter</code>.</td></tr>
 <tr><td><code>cowamm</code></td><td>Native (<code>CowAMMState</code>)</td><td>-</td><td>Ethereum</td><td><p>CoWAMM doesn't have a Tycho Execution component. This is because of CoWAMM's unique design where only cowswap solvers can unlock the liquidity pools after sharing a quote.</p><p>You will have to integrate execution yourself (see <a href="https://docs.cow.fi/cow-amm/tutorials/cow-amm-for-solvers#creating-cow-amm-orders-with-the-helper-contract" target="_blank" rel="noopener noreferrer">cowamm docs</a> and <a href="https://github.com/adpthegreat/cowamm-execution/blob/main/examples/example.rs" target="_blank" rel="noopener noreferrer">example</a>).</p></td></tr>
@@ -66,6 +67,7 @@ fn register_exchanges(
                 .exchange::<UniswapV4State>("uniswap_v4", tvl_filter.clone(), None)
                 .exchange::<UniswapV3State>("pancakeswap_v3", tvl_filter.clone(), None)
                 .exchange::<AerodromeSlipstreamsState>("aerodrome_slipstreams", tvl_filter.clone(), None)
+                .exchange::<LunarBaseState>("lunarbase", tvl_filter.clone(), None)
         }
         Chain::Unichain => {
             builder = builder

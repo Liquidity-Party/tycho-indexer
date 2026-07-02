@@ -29,6 +29,7 @@ const deploy_protocols = {
         "rfq:liquorice",
         "vm:fermiswap",
         "vm:bopamm",
+        "rfq:metric",
     ],
     "base": [
         "uniswap_v2",
@@ -54,12 +55,14 @@ const deploy_protocols = {
         "uniswap_v3",
         "uniswap_v4",
         "native_wrapper",
+        "rfq:metric",
     ],
     "polygon": [
         "uniswap_v2",
         "uniswap_v3",
         "uniswap_v4",
         "native_wrapper",
+        "rfq:metric",
     ],
     "bsc": [
         "uniswap_v2",
@@ -67,6 +70,7 @@ const deploy_protocols = {
         "uniswap_v3",
         "uniswap_v4",
         "native_wrapper",
+        "rfq:metric",
     ],
 };
 

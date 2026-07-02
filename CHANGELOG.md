@@ -1,3 +1,37 @@
+## [0.322.0](https://github.com/propeller-heads/tycho/compare/0.321.0...0.322.0) (2026-07-02)
+
+
+### Features
+
+* Add LunarBase to Maximodel ([9ae5a0a](https://github.com/propeller-heads/tycho/commit/9ae5a0a1566171565e9d4942e8ad926d793cca25))
+* Add LunarBase to Maximodel ([#1124](https://github.com/propeller-heads/tycho/issues/1124)) ([084e515](https://github.com/propeller-heads/tycho/commit/084e515ae9dd038c2f8cf0824d0286bd615e2ccd))
+
+## [0.321.0](https://github.com/propeller-heads/tycho/compare/0.320.4...0.321.0) (2026-07-02)
+
+
+### Features
+
+* add metric executor deployments ([0a8ac8c](https://github.com/propeller-heads/tycho/commit/0a8ac8c163b069f3738139c4a36ac7f73c2aa61b))
+* add metric executor deployments ([#1141](https://github.com/propeller-heads/tycho/issues/1141)) ([98f22e0](https://github.com/propeller-heads/tycho/commit/98f22e0af5d20a9442bb8fafe605dd270fd36d46))
+
+## [0.320.4](https://github.com/propeller-heads/tycho/compare/0.320.3...0.320.4) (2026-07-02)
+
+
+### Bug Fixes
+
+* update image tag description ([5cb5f40](https://github.com/propeller-heads/tycho/commit/5cb5f400a2325a51db7ebb750b9c31752cbc2e9d))
+* update image tag description ([#1149](https://github.com/propeller-heads/tycho/issues/1149)) ([6142405](https://github.com/propeller-heads/tycho/commit/6142405ac30fec246d7b4039133ce579eac3dff0))
+
+## [0.320.3](https://github.com/propeller-heads/tycho/compare/0.320.2...0.320.3) (2026-07-02)
+
+## [0.320.2](https://github.com/propeller-heads/tycho/compare/0.320.1...0.320.2) (2026-07-01)
+
+
+### Bug Fixes
+
+* retry on lagging RPC in integration test validation ([1defd19](https://github.com/propeller-heads/tycho/commit/1defd1941da3ca2764eb35fc82a646720872b590))
+* retry on lagging RPC in integration test validation ([#1146](https://github.com/propeller-heads/tycho/issues/1146)) ([405ed88](https://github.com/propeller-heads/tycho/commit/405ed8863bb99a84871c9d0207b7a4683c56b9fd))
+
 ## [0.320.1](https://github.com/propeller-heads/tycho/compare/0.320.0...0.320.1) (2026-06-30)
 
 

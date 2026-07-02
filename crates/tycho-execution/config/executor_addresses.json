@@ -41,7 +41,7 @@
     "uniswap_v4": "0x3AE67e7DCFa6c5aB36DA9dE3B67B7496956E0874",
     "velodrome_slipstreams": "0xd9Ee40C6895De968b41b96253970B48Fe852e5eF",
     "vm:curve": "0x685733eDB7654e540aB537eabC28b554646b69d0",
-    "native_wrapper": "0x50905E0f94350f9e533Cd275667AFC728265960D"
+    "native_wrapper": "0x32Ed490Fb53cc66C3cBDdC74aB8B7088F11d6289"
   },
   "arbitrum": {
     "uniswap_v2": "0xd0a1f74d4d77834feca0efa01ca6e0161dbf1f57",

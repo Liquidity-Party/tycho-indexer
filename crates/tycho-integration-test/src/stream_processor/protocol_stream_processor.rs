@@ -25,7 +25,7 @@ use tycho_simulation::{
                 fluid_v1_paused_pools_filter, liquidityparty_killed_pools_filter,
             },
             fluid::FluidV1,
-            lunarbase::LunarBaseTychoState,
+            lunarbase::LunarBaseState,
             pancakeswap_v2::state::PancakeswapV2State,
             rocketpool::state::RocketpoolState,
             uniswap_v2::state::UniswapV2State,
@@ -366,8 +366,7 @@ impl ProtocolStreamProcessor {
                 );
             }
             "lunarbase" => {
-                stream =
-                    stream.exchange::<LunarBaseTychoState>("lunarbase", tvl_filter.clone(), None);
+                stream = stream.exchange::<LunarBaseState>("lunarbase", tvl_filter.clone(), None);
             }
             _ => {
                 return Err(miette::miette!("Unknown protocol: {}", protocol));
