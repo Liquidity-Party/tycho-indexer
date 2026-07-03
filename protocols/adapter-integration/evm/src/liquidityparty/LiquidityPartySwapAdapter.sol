@@ -149,21 +149,27 @@ contract LiquidityPartySwapAdapter is ISwapAdapter {
         view
         returns (uint256[] memory limits)
     {
-        // We arbitrarily limit the amounts like Uniswap V2 does, to make the
-        // test cases work. There is no theoretical limit on the input amount.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        address pool = address(bytes20(poolId));
+        IPartyPool pool = _poolFromId(poolId);
+        (uint256 indexIn, uint256 indexOut) =
+            _tokenIndexes(pool, sellToken, buyToken);
         limits = new uint256[](2);
 
-        // input token limit: Theoretically unlimited, but artificially limited
-        // here to practical ranges. Instead of estimating actual
-        // input limits based on a maximum target slippage, we merely return a
-        // fixed fraction of the input token's current inventory as a practical
-        // limit.
-        limits[0] = IERC20(sellToken).balanceOf(pool);
+        // We use 1/2 the output balance as a reasonable maximum target
+        // that would be within slippage bounds, then compute the input
+        // token limit using the exact-out amount helper.
+        uint256 maxOutput = IERC20(buyToken).balanceOf(address(pool)) / 2;
+        if (maxOutput == 0) {
+            return limits;
+        }
 
-        // output token limit: the pool's current balance
-        limits[1] = IERC20(buyToken).balanceOf(pool);
+        // slither-disable-next-line unused-return
+        (uint256 amountIn,) =
+            INFO.swapAmountsForExactOutput(pool, indexIn, indexOut, maxOutput);
+
+        // input token limit: the input required to buy `maxOutput`
+        limits[0] = amountIn;
+        // output token limit: a safe fraction of the pool's current balance
+        limits[1] = maxOutput;
     }
 
     function getCapabilities(bytes32, address, address)
@@ -262,4 +268,3 @@ contract LiquidityPartySwapAdapter is ISwapAdapter {
         return IPartyPool(address(bytes20(poolId)));
     }
 }
-
