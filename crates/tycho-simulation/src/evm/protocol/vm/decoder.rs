@@ -244,6 +244,10 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for EVMPoolState<PreCache
             .await
             .map_err(InvalidSnapshotError::VMError)?;
 
+        if let Some(receiver) = decoder_context.live_override.clone() {
+            pool_state.set_live_overrides(receiver);
+        }
+
         pool_state.set_spot_prices(all_tokens)?;
 
         Ok(pool_state)

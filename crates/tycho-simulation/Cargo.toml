@@ -113,6 +113,7 @@ evm = [
     "dep:revm-inspectors",
     "dep:alloy",
     "dep:reqwest",
+    "dep:tokio-tungstenite",
 ]
 rfq = [
     "dep:reqwest",

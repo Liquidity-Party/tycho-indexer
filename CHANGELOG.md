@@ -1,3 +1,21 @@
+## [0.323.0](https://github.com/propeller-heads/tycho/compare/0.322.0...0.323.0) (2026-07-03)
+
+
+### Features
+
+* live pAMM state-override stream integration ([#1106](https://github.com/propeller-heads/tycho/issues/1106)) ([d217aea](https://github.com/propeller-heads/tycho/commit/d217aea1dec0575e9aa96041f467f78fd147fa92))
+* **simulation:** add live VM state-override stream for pAMMs ([f263e1a](https://github.com/propeller-heads/tycho/commit/f263e1a56ec92775f2481f95110c7150ee6ddf41))
+* **simulation:** allow overriding the Titan endpoint via env var ([2fb89d4](https://github.com/propeller-heads/tycho/commit/2fb89d4617b4e9fe079628a89ed82c5eb9c6b540))
+* **simulation:** expire live overrides after their provider-set TTL ([11cec14](https://github.com/propeller-heads/tycho/commit/11cec14d2f9ca931f312d779dc687f003cee3c7c))
+
+
+### Bug Fixes
+
+* **simulation:** add connect timeout to Titan quote stream ([5d76394](https://github.com/propeller-heads/tycho/commit/5d76394b66e4aaa4059de6530f864793fa48f0b4))
+* **simulation:** harden TitanProvider connection handling ([dfcb6c9](https://github.com/propeller-heads/tycho/commit/dfcb6c9bbea20914959fa742731efda1f9fd59c5))
+* **simulation:** read live override snapshot once per simulation ([5d347db](https://github.com/propeller-heads/tycho/commit/5d347db56c05cc7a1e50cc41462909dd49833dfd))
+* **simulation:** stop Titan task when all receivers are dropped ([4f3bce6](https://github.com/propeller-heads/tycho/commit/4f3bce6950b7995accb96db8497ca26298da4f5c))
+
 ## [0.322.0](https://github.com/propeller-heads/tycho/compare/0.321.0...0.322.0) (2026-07-02)
 
 
