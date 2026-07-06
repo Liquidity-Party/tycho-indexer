@@ -5,6 +5,7 @@ import {Constants} from "../Constants.sol";
 import {TransferManager} from "@src/TransferManager.sol";
 import {
     RingSwapV2Executor,
+    RingSwapV2Executor__InvalidFewToken,
     RingSwapV2Executor__InvalidDataLength
 } from "@src/executors/RingSwapV2Executor.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -177,6 +178,32 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         assertEq(IFewWrappedTokenWithUnderlying(FW_DAI).token(), DAI_ADDR);
         assertEq(IFewWrappedTokenWithUnderlying(FW_WETH).token(), WETH_ADDR);
         assertEq(IFewWrappedTokenWithUnderlying(FW_USDT).token(), USDT_ADDR);
+    }
+
+    function testSwapRejectsInvalidInputFewToken() public {
+        bytes memory params = abi.encodePacked(
+            RING_DAI_WETH_PAIR, DAI_ADDR, WETH_ADDR, FW_WETH, FW_WETH
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidFewToken.selector, DAI_ADDR, FW_WETH
+            )
+        );
+        ringSwapV2Exposed.swap(100 ether, params, BOB);
+    }
+
+    function testSwapRejectsInvalidOutputFewToken() public {
+        bytes memory params = abi.encodePacked(
+            RING_DAI_WETH_PAIR, DAI_ADDR, WETH_ADDR, FW_DAI, FW_DAI
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidFewToken.selector, WETH_ADDR, FW_DAI
+            )
+        );
+        ringSwapV2Exposed.swap(100 ether, params, BOB);
     }
 
     function testSwapWbtcForWethWrapsSwapsAndUnwraps() public {

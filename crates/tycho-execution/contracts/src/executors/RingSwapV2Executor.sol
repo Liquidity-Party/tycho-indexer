@@ -16,12 +16,22 @@ interface IFewWrappedToken {
     function unwrapTo(uint256 amount, address to) external returns (uint256);
 }
 
+interface IFewFactory {
+    function getWrappedToken(address originalToken)
+        external
+        view
+        returns (address);
+}
+
 error RingSwapV2Executor__InvalidDataLength();
+error RingSwapV2Executor__InvalidFewToken(address token, address fwToken);
 
 contract RingSwapV2Executor is IExecutor {
     using SafeERC20 for IERC20;
 
     uint256 private constant FEE_BPS = 30;
+    address private constant FEW_FACTORY =
+        0x7D86394139bf1122E82FDF45Bb4e3b038A4464DD;
 
     function fundsExpectedAddress(bytes calldata data)
         external
@@ -39,10 +49,14 @@ contract RingSwapV2Executor is IExecutor {
     {
         (
             address target,
-            address tokenIn,,
+            address tokenIn,
+            address tokenOut,
             address fwTokenIn,
             address fwTokenOut
         ) = _decodeData(data);
+
+        _validateFewToken(tokenIn, fwTokenIn);
+        _validateFewToken(tokenOut, fwTokenOut);
 
         IERC20(tokenIn).forceApprove(fwTokenIn, amountIn);
         uint256 fwAmountIn =
@@ -76,6 +90,12 @@ contract RingSwapV2Executor is IExecutor {
             pool.swap(0, amountOut, receiver, "");
         } else {
             pool.swap(amountOut, 0, receiver, "");
+        }
+    }
+
+    function _validateFewToken(address token, address fwToken) internal view {
+        if (IFewFactory(FEW_FACTORY).getWrappedToken(token) != fwToken) {
+            revert RingSwapV2Executor__InvalidFewToken(token, fwToken);
         }
     }
 
