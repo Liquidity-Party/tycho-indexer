@@ -11,13 +11,14 @@ use substreams_helper::{event_handler::EventHandler, hex::Hexable};
 
 use crate::abi::{factory::events::PairCreated, few_factory, few_wrapped_token};
 
-use tycho_substreams::{abi::erc20, prelude::*};
+use tycho_substreams::prelude::*;
+
+const PROTOCOL_TYPE_NAME: &str = "ring_swap_v2_pool";
 
 #[derive(Debug, Deserialize)]
 struct Params {
     factory_address: String,
     few_factory_address: String,
-    protocol_type_name: String,
 }
 
 #[substreams::handlers::map]
@@ -74,10 +75,10 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
                 id: event.pair.to_hex(),
                 tokens: tokens.component_tokens.clone(),
                 contracts: vec![],
-                static_att: static_attributes(&event, factory_address, &tokens),
+                static_att: static_attributes(&event, &tokens),
                 change: i32::from(ChangeType::Creation),
                 protocol_type: Some(ProtocolType {
-                    name: params.protocol_type_name.to_string(),
+                    name: PROTOCOL_TYPE_NAME.to_string(),
                     financial_type: FinancialType::Swap.into(),
                     attribute_schema: vec![],
                     implementation_type: ImplementationType::Custom.into(),
@@ -108,11 +109,7 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
     eh.handle_events();
 }
 
-fn static_attributes(
-    event: &PairCreated,
-    factory_address: Address,
-    tokens: &RingTokens,
-) -> Vec<Attribute> {
+fn static_attributes(event: &PairCreated, tokens: &RingTokens) -> Vec<Attribute> {
     vec![
         // Trading Fee is hardcoded to 0.3%, saved as int in bps (basis points)
         Attribute {
@@ -123,11 +120,6 @@ fn static_attributes(
         Attribute {
             name: "pool_address".to_string(),
             value: event.pair.clone(),
-            change: ChangeType::Creation.into(),
-        },
-        Attribute {
-            name: "pool_factory".to_string(),
-            value: factory_address.as_bytes().to_vec(),
             change: ChangeType::Creation.into(),
         },
         Attribute {
@@ -151,26 +143,6 @@ fn static_attributes(
             change: ChangeType::Creation.into(),
         },
         Attribute {
-            name: "fw_decimals0".to_string(),
-            value: vec![tokens.fw_decimals0],
-            change: ChangeType::Creation.into(),
-        },
-        Attribute {
-            name: "fw_decimals1".to_string(),
-            value: vec![tokens.fw_decimals1],
-            change: ChangeType::Creation.into(),
-        },
-        Attribute {
-            name: "underlying_decimals0".to_string(),
-            value: vec![tokens.underlying_decimals0],
-            change: ChangeType::Creation.into(),
-        },
-        Attribute {
-            name: "underlying_decimals1".to_string(),
-            value: vec![tokens.underlying_decimals1],
-            change: ChangeType::Creation.into(),
-        },
-        Attribute {
             name: "reserves_inverted".to_string(),
             value: if tokens.reserves_inverted { vec![1] } else { vec![0] },
             change: ChangeType::Creation.into(),
@@ -184,10 +156,6 @@ struct RingTokens {
     fw_token1: Vec<u8>,
     underlying_token0: Vec<u8>,
     underlying_token1: Vec<u8>,
-    fw_decimals0: u8,
-    fw_decimals1: u8,
-    underlying_decimals0: u8,
-    underlying_decimals1: u8,
     reserves_inverted: bool,
 }
 
@@ -195,23 +163,18 @@ struct RingTokens {
 ///
 /// Ring pairs hold FewTokens (wrapped ERC-20s), but components are exposed to solvers with the
 /// underlying ERC-20s as tokens. Metadata is fetched with two batched eth_calls: one against both
-/// pair tokens (token() + decimals()), and one against FewFactory plus the resolved underlying
-/// tokens. Returns None when the pair tokens are not official FewFactory wrappers or any call
-/// fails.
+/// pair tokens (token()), and one against FewFactory for the resolved underlying tokens. Returns
+/// None when the pair tokens are not official FewFactory wrappers or any call fails.
 fn resolve_ring_tokens(event: &PairCreated, few_factory_address: Address) -> Option<RingTokens> {
     let fw_responses = RpcBatch::new()
         .add(few_wrapped_token::functions::Token {}, event.token0.clone())
         .add(few_wrapped_token::functions::Token {}, event.token1.clone())
-        .add(erc20::functions::Decimals {}, event.token0.clone())
-        .add(erc20::functions::Decimals {}, event.token1.clone())
         .execute()
         .ok()?
         .responses;
 
     let underlying_token0 = decode_underlying_token(fw_responses.first()?)?;
     let underlying_token1 = decode_underlying_token(fw_responses.get(1)?)?;
-    let fw_decimals0 = decode_decimals(fw_responses.get(2)?)?;
-    let fw_decimals1 = decode_decimals(fw_responses.get(3)?)?;
 
     let underlying_responses = RpcBatch::new()
         .add(
@@ -222,8 +185,6 @@ fn resolve_ring_tokens(event: &PairCreated, few_factory_address: Address) -> Opt
             few_factory::functions::GetWrappedToken { original_token: underlying_token1.clone() },
             few_factory_address.as_bytes().to_vec(),
         )
-        .add(erc20::functions::Decimals {}, underlying_token0.clone())
-        .add(erc20::functions::Decimals {}, underlying_token1.clone())
         .execute()
         .ok()?
         .responses;
@@ -243,9 +204,6 @@ fn resolve_ring_tokens(event: &PairCreated, few_factory_address: Address) -> Opt
         );
         return None;
     }
-
-    let underlying_decimals0 = decode_decimals(underlying_responses.get(2)?)?;
-    let underlying_decimals1 = decode_decimals(underlying_responses.get(3)?)?;
 
     // Components expose the underlying tokens sorted by address, matching the UniswapV2 token
     // order convention downstream simulation relies on. The underlying order can differ from the
@@ -267,10 +225,6 @@ fn resolve_ring_tokens(event: &PairCreated, few_factory_address: Address) -> Opt
         fw_token1: event.token1.clone(),
         underlying_token0,
         underlying_token1,
-        fw_decimals0,
-        fw_decimals1,
-        underlying_decimals0,
-        underlying_decimals1,
         reserves_inverted,
     })
 }
@@ -287,16 +241,6 @@ fn decode_official_wrapped_token(response: &RpcResponse) -> Option<Vec<u8>> {
         return None;
     }
     RpcBatch::decode::<_, few_factory::functions::GetWrappedToken>(response)
-}
-
-fn decode_decimals(response: &RpcResponse) -> Option<u8> {
-    if response.failed {
-        return None;
-    }
-    let decimals: BigInt = RpcBatch::decode::<_, erc20::functions::Decimals>(response)?;
-    // decimals() is uint8 in the ABI, but a non-conforming token can return any 32-byte word;
-    // reject values that do not fit u8 instead of panicking.
-    decimals.to_string().parse::<u8>().ok()
 }
 
 fn official_wrappers_match(
