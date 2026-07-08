@@ -13,6 +13,38 @@ use crate::encoding::{
     swap_encoder::SwapEncoder,
 };
 
+const SIGNED_USER_DATA_MIN_LEN: usize = 8 + 32 + 32; // fee + meta + minBalanceUpdate
+
+struct SignedSwapTail {
+    fee: u64,
+    meta: [u8; 32],
+    min_balance_update: [u8; 32],
+    signature: Vec<u8>,
+}
+
+/// Parses `user_data` into a signed swap tail when present.
+///
+/// Expected byte layout: `fee(8) | meta(32) | minBalanceUpdate(32) | signature(N)`.
+fn parse_signed_user_data(
+    user_data: &Option<Bytes>,
+) -> Result<Option<SignedSwapTail>, EncodingError> {
+    let Some(data) = user_data.as_ref() else {
+        return Ok(None);
+    };
+    if data.len() < SIGNED_USER_DATA_MIN_LEN {
+        return Err(EncodingError::FatalError(format!(
+            "signed user_data too short: {} bytes, need at least {SIGNED_USER_DATA_MIN_LEN}",
+            data.len()
+        )));
+    }
+    // Infallible: length validated above guarantees these slices are exact.
+    let fee = u64::from_be_bytes(data[..8].try_into().expect("8 bytes"));
+    let meta: [u8; 32] = data[8..40].try_into().expect("32 bytes");
+    let min_balance_update: [u8; 32] = data[40..72].try_into().expect("32 bytes");
+    let signature = data[72..].to_vec();
+    Ok(Some(SignedSwapTail { fee, meta, min_balance_update, signature }))
+}
+
 /// Encodes a swap on an Ekubo V3 pool through the given executor address.
 ///
 /// # Fields
@@ -36,11 +68,17 @@ impl SwapEncoder for EkuboV3SwapEncoder {
         swap: &Swap,
         encoding_context: &EncodingContext,
     ) -> Result<Vec<u8>, EncodingError> {
-        let fee = u64::from_be_bytes(
-            get_static_attribute(swap, "fee")?
-                .try_into()
-                .map_err(|_| EncodingError::FatalError("fee should be an u64".to_string()))?,
-        );
+        let signed_tail = parse_signed_user_data(swap.user_data())?;
+
+        let fee = if let Some(ref tail) = signed_tail {
+            tail.fee
+        } else {
+            u64::from_be_bytes(
+                get_static_attribute(swap, "fee")?
+                    .try_into()
+                    .map_err(|_| EncodingError::FatalError("fee should be an u64".to_string()))?,
+            )
+        };
 
         let pool_type_config = B32::try_from(&get_static_attribute(swap, "pool_type_config")?[..])
             .map_err(|_| {
@@ -66,24 +104,16 @@ impl SwapEncoder for EkuboV3SwapEncoder {
         // A signed (SignedExclusiveSwap, forward-only) hop carries a self-describing tail so the
         // executor's length-aware walk can skip past it to any following hop. When `user_data` is
         // absent the hop is byte-identical to a normal hop, preserving existing behavior.
-        if let Some(user_data) = swap.user_data() {
-            // user_data layout: meta(32) | minBalanceUpdate(32) | signature(N)
-            // Wire format:      meta(32) | minBalanceUpdate(32) | sigLen(u16 be) | signature(N)
-            const SIGNED_FIXED_PREFIX: usize = 64;
-            if user_data.len() < SIGNED_FIXED_PREFIX {
-                return Err(EncodingError::FatalError(
-                    "signed swap user_data must be at least 64 bytes (meta + minBalanceUpdate)"
-                        .to_string(),
-                ));
-            }
-            let signature = &user_data[SIGNED_FIXED_PREFIX..];
-            let sig_len = u16::try_from(signature.len()).map_err(|_| {
+        if let Some(tail) = signed_tail {
+            // Wire format: meta(32) | minBalanceUpdate(32) | sigLen(u16 be) | signature(N)
+            let sig_len = u16::try_from(tail.signature.len()).map_err(|_| {
                 EncodingError::FatalError("signature length exceeds u16::MAX".to_string())
             })?;
 
-            encoded.extend_from_slice(&user_data[..SIGNED_FIXED_PREFIX]);
+            encoded.extend_from_slice(&tail.meta);
+            encoded.extend_from_slice(&tail.min_balance_update);
             encoded.extend_from_slice(&sig_len.to_be_bytes());
-            encoded.extend_from_slice(signature);
+            encoded.extend_from_slice(&tail.signature);
         }
 
         Ok(encoded)
@@ -170,13 +200,15 @@ mod tests {
 
         let component = ProtocolComponent { static_attributes, ..Default::default() };
 
-        // `user_data` is the packed concatenation meta(32) | minBalanceUpdate(32) | signature(N).
-        // The encoder splits it and inserts the 2-byte big-endian signature length.
+        // `user_data` layout: fee(8) | meta(32) | minBalanceUpdate(32) | signature(N).
+        // The encoder extracts the fee for the pool config and inserts the 2-byte
+        // big-endian signature length before the signature on the wire.
+        let fee_hex = "00000000deadbeef"; // target fee override
         let meta = "1111111111111111111111111111111111111111111111111111111111111111";
         let min_balance_update = "2222222222222222222222222222222222222222222222222222222222222222";
         let signature = "abcdef0123456789"; // 8-byte signature
         let user_data =
-            Bytes::from_str(&format!("0x{meta}{min_balance_update}{signature}")).unwrap();
+            Bytes::from_str(&format!("0x{fee_hex}{meta}{min_balance_update}{signature}")).unwrap();
 
         let swap = Swap::new(
             component,
@@ -207,8 +239,8 @@ mod tests {
                 "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 // token out
                 "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-                // pool config (extension = SIGNED_EXCLUSIVE_SWAP placeholder)
-                "5519ed5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000",
+                // pool config: extension(20) | fee(8, from user_data) | pool_type_config(4)
+                "5519ed5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e00000000deadbeef00000000",
                 // meta(32)
                 "1111111111111111111111111111111111111111111111111111111111111111",
                 // minBalanceUpdate(32)
