@@ -34,12 +34,13 @@ contract RingSwapV2Executor is IExecutor {
         fewFactory = fewFactory_;
     }
 
-    function fundsExpectedAddress(bytes calldata data)
+    function fundsExpectedAddress(
+        bytes calldata /* data */
+    )
         external
         view
         returns (address receiver)
     {
-        _decodeData(data);
         return msg.sender;
     }
 
