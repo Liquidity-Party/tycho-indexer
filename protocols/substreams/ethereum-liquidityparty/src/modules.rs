@@ -8,7 +8,8 @@ use std::collections::{HashMap, HashSet};
 use substreams::{pb::substreams::StoreDeltas, prelude::*};
 use substreams_ethereum::{pb::eth, Event};
 use tycho_substreams::{
-    balances::aggregate_balances_changes, contract::extract_contract_changes_builder, prelude::*,
+    abi::erc20, balances::aggregate_balances_changes, contract::extract_contract_changes_builder,
+    prelude::*,
 };
 
 /// Find and create all relevant protocol components
@@ -120,10 +121,16 @@ fn map_killed_components(
     })
 }
 
-/// Tracks TVL changes per component using PartyPool events.
+/// Tracks balance changes per component by scanning ERC20 `Transfer` events.
 ///
-/// Protocol fees sit in the pool until being collected but have separate accounting
-/// and do not contribute to TVL.
+/// We deliberately do NOT derive balances from PartyPool events (Mint/Burn/Swap/etc.).
+/// A pool's true reserve is simply its on-chain ERC20 balance, and that balance can change
+/// without any pool event ever being emitted: anyone can make an unsolicited donation by
+/// transferring tokens directly to the pool address. Such a donation moves the real balance
+/// but produces no Mint/Swap/Burn log, so an event-derived balance would silently drift away
+/// from the truth. Scanning `Transfer` events with the pool as `to`/`from` is therefore the
+/// only way to reconstruct the actual balance: every balance change of an ERC20 token — pool
+/// operations, donations, or anything else — necessarily emits a `Transfer` touching the pool.
 #[substreams::handlers::map]
 fn map_relative_component_balance(
     block: eth::v2::Block,
@@ -133,63 +140,39 @@ fn map_relative_component_balance(
     let mut deltas: Vec<BalanceDelta> = Vec::new();
 
     for log in block.logs() {
-        let pool_addr = encode_addr(log.address());
-        // Short circuit if the address doesn't match any of our pools
-        let Some(tokens_str) = store.get_last(&pool_addr) else { continue };
-        // Short circuit if the pool has been killed
-        if killed_store
-            .get_last(&pool_addr)
-            .is_some()
-        {
-            continue;
-        }
-        let component_tokens = decode_addrs(&tokens_str)?;
-        let component_id = pool_addr.as_bytes().to_vec();
+        let Some(transfer) = erc20::events::Transfer::match_and_decode(log) else { continue };
+        let token = log.address().to_vec();
         let tx = log.receipt.transaction;
         let ord = log.ordinal();
 
-        let mut push = |token: Vec<u8>, delta: substreams::scalar::BigInt| {
-            if !delta.is_zero() {
-                deltas.push(BalanceDelta {
-                    ord,
-                    tx: Some(tx.into()),
-                    token,
-                    delta: delta.to_signed_bytes_be(),
-                    component_id: component_id.clone(),
-                });
-            }
-        };
-
-        if let Some(ev) = party_pool::events::Mint::match_and_decode(log) {
-            // Basket mint deposits some of every token
-            for (token, amount) in component_tokens
-                .iter()
-                .zip(ev.amounts.into_iter())
+        // The transferred value flows out of `from` and into `to`. Either (or both, for a
+        // pool-to-pool transfer) may be one of our pools, so evaluate each side independently.
+        for (pool, delta) in
+            [(&transfer.from, transfer.value.clone().neg()), (&transfer.to, transfer.value.clone())]
+        {
+            let pool_addr = encode_addr(pool);
+            // Short circuit if the address doesn't match any of our pools
+            let Some(tokens_str) = store.get_last(&pool_addr) else { continue };
+            // Short circuit if the pool has been killed
+            if killed_store
+                .get_last(&pool_addr)
+                .is_some()
             {
-                push(token.clone(), amount);
+                continue;
             }
-        } else if let Some(ev) = party_pool::events::Burn::match_and_decode(log) {
-            // Basket burn withdraws some of every token
-            for (token, amount) in component_tokens
-                .iter()
-                .zip(ev.amounts.into_iter())
-            {
-                push(token.clone(), amount.neg());
+            // Only track tokens that belong to the pool's basket; ignore any other token
+            // that happens to be transferred to or from the pool address.
+            let component_tokens = decode_addrs(&tokens_str)?;
+            if !component_tokens.contains(&token) {
+                continue;
             }
-        } else if let Some(ev) = party_pool::events::Swap::match_and_decode(log) {
-            // Fee-on-output: the full input enters the pool. The protocol fee is
-            // taken from the output token and moved to the protocol-fee ledger
-            // (excluded from TVL), so the LP-owned reserve loses the net output
-            // plus the protocol fee. The LP fee stays in the reserve.
-            push(ev.token_in, ev.amount_in);
-            push(ev.token_out, (ev.amount_out + ev.protocol_fee).neg());
-        } else if let Some(ev) = party_pool::events::SwapMint::match_and_decode(log) {
-            // Excludes the protocol fee taken the from input amount
-            push(ev.token_in, ev.amount_in - ev.protocol_fee);
-        } else if let Some(ev) = party_pool::events::BurnSwap::match_and_decode(log) {
-            // The output amount is what the user receives, but the pool TVL also
-            // loses the protocol fee.
-            push(ev.token_out, (ev.amount_out + ev.protocol_fee).neg());
+            deltas.push(BalanceDelta {
+                ord,
+                tx: Some(tx.into()),
+                token: token.clone(),
+                delta: delta.to_signed_bytes_be(),
+                component_id: pool_addr.into_bytes(),
+            });
         }
     }
 

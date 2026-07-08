@@ -115,6 +115,15 @@ where
     }
 }
 
+/// Curve migrated from the generic VM adapter (`EVMPoolState`) to the native [`CurveState`]
+/// decoder. Returns true when `vm:curve` is registered with any other type — i.e. the deprecated
+/// VM-adapter path, still supported for a few releases before removal.
+fn is_deprecated_curve_registration<T: 'static>(exchange: &str) -> bool {
+    exchange == "vm:curve" &&
+        std::any::type_name::<T>() !=
+            std::any::type_name::<crate::evm::protocol::curve::CurveState>()
+}
+
 impl<H> TychoStreamDecoder<H>
 where
     H: HeaderLike + Clone + Sync + Send + 'static + std::fmt::Debug,
@@ -185,6 +194,14 @@ where
             + Send
             + 'static,
     {
+        if is_deprecated_curve_registration::<T>(exchange) {
+            warn!(
+                registered_type = std::any::type_name::<T>(),
+                "Registering \"vm:curve\" with the generic VM adapter is deprecated; register the \
+                 native `CurveState` decoder instead (`exchange::<CurveState>(\"vm:curve\", ...)`). \
+                 The VM-adapter path still works but will be removed in a future release."
+            );
+        }
         let decoder = Box::new(
             move |component: ComponentWithState,
                   header: H,
@@ -1241,7 +1258,17 @@ mod tests {
     use tycho_common::{models::Chain, Bytes};
 
     use super::*;
-    use crate::evm::protocol::uniswap_v2::state::UniswapV2State;
+    use crate::evm::protocol::{curve::CurveState, uniswap_v2::state::UniswapV2State};
+
+    #[test]
+    fn curve_vm_adapter_registration_flagged_deprecated() {
+        // The native decoder is the supported path — not flagged.
+        assert!(!is_deprecated_curve_registration::<CurveState>("vm:curve"));
+        // Any other type for vm:curve is the deprecated VM-adapter path.
+        assert!(is_deprecated_curve_registration::<UniswapV2State>("vm:curve"));
+        // Other exchanges are unaffected.
+        assert!(!is_deprecated_curve_registration::<UniswapV2State>("uniswap_v2"));
+    }
 
     async fn setup_decoder(set_tokens: bool) -> TychoStreamDecoder<BlockHeader> {
         let mut decoder = TychoStreamDecoder::new();
