@@ -234,8 +234,11 @@ impl Executor {
                 output_to_router: false,
             }),
             Self::RingSwapV2 => Ok(TransferData {
-                transfer_type: TransferType::Transfer,
-                receiver: Address::Router,
+                transfer_type: TransferType::ProtocolWillDebit,
+                receiver: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 60, end: 80 },
+                    Address::VARIANTS,
+                )?,
                 token_in: params.request(
                     ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
                     Address::POSSIBLY_ERC20_AND_NATIVE,
@@ -545,6 +548,19 @@ impl Executor {
                 }
 
                 if pool.is_sender_controlled() {
+                    let token_in = params.request(
+                        ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                        Address::VARIANTS,
+                    )?;
+                    state.erc20_safe_transfer_from(
+                        token_in,
+                        fw_token_in,
+                        Address::Router,
+                        fw_token_in,
+                        amount,
+                    )?;
+                    state.erc20_safe_transfer(fw_token_in, fw_token_in, pool, amount)?;
+
                     // if the sender controls the pool,
                     // the actual swap logic doesn't matter
                     Ok(())

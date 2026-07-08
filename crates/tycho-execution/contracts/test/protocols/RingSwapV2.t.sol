@@ -1,12 +1,14 @@
 pragma solidity ^0.8.26;
 
+import "../TychoRouterTestSetup.sol";
 import {TestUtils} from "../TestUtils.sol";
 import {Constants} from "../Constants.sol";
 import {TransferManager} from "@src/TransferManager.sol";
 import {
     RingSwapV2Executor,
     RingSwapV2Executor__InvalidFewToken,
-    RingSwapV2Executor__InvalidDataLength
+    RingSwapV2Executor__InvalidDataLength,
+    RingSwapV2Executor__ZeroFewFactory
 } from "@src/executors/RingSwapV2Executor.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
@@ -18,6 +20,8 @@ interface IFewWrappedTokenWithUnderlying {
 }
 
 contract RingSwapV2ExecutorExposed is RingSwapV2Executor {
+    constructor(address fewFactory_) RingSwapV2Executor(fewFactory_) {}
+
     function decodeParams(bytes calldata data)
         external
         pure
@@ -71,7 +75,16 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), RING_FORK_BLOCK);
-        ringSwapV2Exposed = new RingSwapV2ExecutorExposed();
+        ringSwapV2Exposed = new RingSwapV2ExecutorExposed(RING_FEW_FACTORY);
+    }
+
+    function testConstructorConfig() public view {
+        assertEq(ringSwapV2Exposed.fewFactory(), RING_FEW_FACTORY);
+    }
+
+    function testConstructorRevertsOnZeroFewFactory() public {
+        vm.expectRevert(RingSwapV2Executor__ZeroFewFactory.selector);
+        new RingSwapV2ExecutorExposed(address(0));
     }
 
     function testDecodeParams() public view {
@@ -154,9 +167,10 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         ) = ringSwapV2Exposed.getTransferData(params);
 
         assertEq(
-            uint8(transferType), uint8(TransferManager.TransferType.Transfer)
+            uint8(transferType),
+            uint8(TransferManager.TransferType.ProtocolWillDebit)
         );
-        assertEq(receiver, address(this));
+        assertEq(receiver, FW_DAI);
         assertEq(tokenIn, DAI_ADDR);
         assertEq(tokenOut, WETH_ADDR);
         assertEq(outputToRouter, false);
@@ -256,6 +270,8 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
             abi.encodePacked(pair, tokenIn, tokenOut, fwTokenIn, fwTokenOut);
 
         deal(tokenIn, address(ringSwapV2Exposed), amountIn);
+        vm.prank(address(ringSwapV2Exposed));
+        IERC20(tokenIn).approve(fwTokenIn, amountIn);
 
         uint256 balanceBefore = IERC20(tokenOut).balanceOf(BOB);
         ringSwapV2Exposed.swap(amountIn, params, BOB);
@@ -266,5 +282,65 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         assertEq(IERC20(tokenIn).balanceOf(address(ringSwapV2Exposed)), 0);
         assertEq(IERC20(fwTokenIn).balanceOf(address(ringSwapV2Exposed)), 0);
         assertEq(IERC20(fwTokenOut).balanceOf(address(ringSwapV2Exposed)), 0);
+    }
+}
+
+contract TychoRouterForRingSwapV2Test is TychoRouterTestSetup {
+    uint256 internal constant RING_FORK_BLOCK = 25283712;
+
+    address internal constant RING_DAI_WETH_PAIR =
+        0x68C498Df05982d635914ee0Ae6501C749A78B473;
+    address internal constant FW_DAI =
+        0x8A6fe57C08C84e0f4eE97aAe68a62e820a37d259;
+    address internal constant FW_WETH =
+        0xa250CC729Bb3323e7933022a67B52200fE354767;
+
+    function getForkBlock() public pure override returns (uint256) {
+        return RING_FORK_BLOCK;
+    }
+
+    function testSingleSwap() public {
+        uint256 amountIn = 100 ether;
+        deal(DAI_ADDR, ALICE, amountIn);
+        bytes memory callData =
+            loadCallDataFromFile("test_single_encoding_strategy_ring_swap_v2");
+
+        uint256 balanceBefore = IERC20(WETH_ADDR).balanceOf(ALICE);
+        vm.startPrank(ALICE);
+        IERC20(DAI_ADDR).approve(tychoRouterAddr, type(uint256).max);
+        (bool success,) = tychoRouterAddr.call(callData);
+        vm.stopPrank();
+
+        uint256 amountOut = IERC20(WETH_ADDR).balanceOf(ALICE) - balanceBefore;
+        assertTrue(success, "Call Failed");
+        assertGt(amountOut, 0);
+        assertEq(IERC20(DAI_ADDR).balanceOf(ALICE), 0);
+        assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(FW_DAI).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(FW_WETH).balanceOf(tychoRouterAddr), 0);
+    }
+
+    function testSequentialSwapIntoRingSwapV2() public {
+        uint256 amountIn = 100e6;
+        deal(USDC_ADDR, ALICE, amountIn);
+        bytes memory callData = loadCallDataFromFile(
+            "test_sequential_encoding_strategy_uniswap_v2_ring_swap_v2"
+        );
+
+        uint256 balanceBefore = IERC20(WETH_ADDR).balanceOf(ALICE);
+        vm.startPrank(ALICE);
+        IERC20(USDC_ADDR).approve(tychoRouterAddr, type(uint256).max);
+        (bool success,) = tychoRouterAddr.call(callData);
+        vm.stopPrank();
+
+        uint256 amountOut = IERC20(WETH_ADDR).balanceOf(ALICE) - balanceBefore;
+        assertTrue(success, "Call Failed");
+        assertGt(amountOut, 0);
+        assertEq(IERC20(USDC_ADDR).balanceOf(ALICE), 0);
+        assertEq(IERC20(USDC_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(FW_DAI).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(FW_WETH).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(WETH_ADDR).balanceOf(tychoRouterAddr), 0);
     }
 }

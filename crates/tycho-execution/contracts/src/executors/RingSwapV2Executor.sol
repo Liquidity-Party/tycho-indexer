@@ -3,10 +3,6 @@ pragma solidity ^0.8.26;
 
 import {IExecutor} from "@interfaces/IExecutor.sol";
 import {
-    SafeERC20,
-    IERC20
-} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {
     IUniswapV2Pair
 } from "@uniswap-v2/contracts/interfaces/IUniswapV2Pair.sol";
 import {TransferManager} from "../TransferManager.sol";
@@ -25,13 +21,18 @@ interface IFewFactory {
 
 error RingSwapV2Executor__InvalidDataLength();
 error RingSwapV2Executor__InvalidFewToken(address token, address fwToken);
+error RingSwapV2Executor__ZeroFewFactory();
 
 contract RingSwapV2Executor is IExecutor {
-    using SafeERC20 for IERC20;
-
     uint256 private constant FEE_BPS = 30;
-    address private constant FEW_FACTORY =
-        0x7D86394139bf1122E82FDF45Bb4e3b038A4464DD;
+    address public immutable fewFactory;
+
+    constructor(address fewFactory_) {
+        if (fewFactory_ == address(0)) {
+            revert RingSwapV2Executor__ZeroFewFactory();
+        }
+        fewFactory = fewFactory_;
+    }
 
     function fundsExpectedAddress(bytes calldata data)
         external
@@ -58,19 +59,15 @@ contract RingSwapV2Executor is IExecutor {
         _validateFewToken(tokenIn, fwTokenIn);
         _validateFewToken(tokenOut, fwTokenOut);
 
-        IERC20(tokenIn).forceApprove(fwTokenIn, amountIn);
         uint256 fwAmountIn =
             IFewWrappedToken(fwTokenIn).wrapTo(amountIn, target);
-        IERC20(tokenIn).forceApprove(fwTokenIn, 0);
 
         bool zeroForOne = fwTokenIn < fwTokenOut;
         uint256 fwAmountOut = _swap(
             IUniswapV2Pair(target), fwAmountIn, zeroForOne, address(this)
         );
 
-        uint256 amountOut =
-            IFewWrappedToken(fwTokenOut).unwrapTo(fwAmountOut, receiver);
-        require(amountOut > 0, "U");
+        IFewWrappedToken(fwTokenOut).unwrapTo(fwAmountOut, receiver);
     }
 
     function _swap(
@@ -94,7 +91,7 @@ contract RingSwapV2Executor is IExecutor {
     }
 
     function _validateFewToken(address token, address fwToken) internal view {
-        if (IFewFactory(FEW_FACTORY).getWrappedToken(token) != fwToken) {
+        if (IFewFactory(fewFactory).getWrappedToken(token) != fwToken) {
             revert RingSwapV2Executor__InvalidFewToken(token, fwToken);
         }
     }
@@ -143,11 +140,15 @@ contract RingSwapV2Executor is IExecutor {
             bool outputToRouter
         )
     {
-        (, address decodedTokenIn, address decodedTokenOut,,) =
-            _decodeData(data);
+        (
+            ,
+            address decodedTokenIn,
+            address decodedTokenOut,
+            address fwTokenIn,
+        ) = _decodeData(data);
         return (
-            TransferManager.TransferType.Transfer,
-            msg.sender,
+            TransferManager.TransferType.ProtocolWillDebit,
+            fwTokenIn,
             decodedTokenIn,
             decodedTokenOut,
             false
