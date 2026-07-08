@@ -39,8 +39,12 @@ fn parse_signed_user_data(
     }
     // Infallible: length validated above guarantees these slices are exact.
     let fee = u64::from_be_bytes(data[..8].try_into().expect("8 bytes"));
-    let meta: [u8; 32] = data[8..40].try_into().expect("32 bytes");
-    let min_balance_update: [u8; 32] = data[40..72].try_into().expect("32 bytes");
+    let meta: [u8; 32] = data[8..40]
+        .try_into()
+        .expect("32 bytes");
+    let min_balance_update: [u8; 32] = data[40..72]
+        .try_into()
+        .expect("32 bytes");
     let signature = data[72..].to_vec();
     Ok(Some(SignedSwapTail { fee, meta, min_balance_update, signature }))
 }
