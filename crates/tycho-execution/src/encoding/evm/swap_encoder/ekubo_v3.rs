@@ -32,19 +32,22 @@ fn parse_signed_user_data(
         return Ok(None);
     };
     if data.len() < SIGNED_USER_DATA_MIN_LEN {
-        return Err(EncodingError::FatalError(format!(
+        return Err(EncodingError::InvalidInput(format!(
             "signed user_data too short: {} bytes, need at least {SIGNED_USER_DATA_MIN_LEN}",
             data.len()
         )));
     }
-    // Infallible: length validated above guarantees these slices are exact.
-    let fee = u64::from_be_bytes(data[..8].try_into().expect("8 bytes"));
+    let fee = u64::from_be_bytes(
+        data[..8]
+            .try_into()
+            .map_err(|_| EncodingError::InvalidInput("fee should be 8 bytes".into()))?,
+    );
     let meta: [u8; 32] = data[8..40]
         .try_into()
-        .expect("32 bytes");
+        .map_err(|_| EncodingError::InvalidInput("meta should be 32 bytes".into()))?;
     let min_balance_update: [u8; 32] = data[40..72]
         .try_into()
-        .expect("32 bytes");
+        .map_err(|_| EncodingError::InvalidInput("minBalanceUpdate should be 32 bytes".into()))?;
     let signature = data[72..].to_vec();
     Ok(Some(SignedSwapTail { fee, meta, min_balance_update, signature }))
 }
