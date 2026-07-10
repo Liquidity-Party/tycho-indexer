@@ -414,7 +414,7 @@ mod tests {
             EkuboV3State::Oracle(_) => 2,
             EkuboV3State::Twamm(_) => 3,
             EkuboV3State::MevCapture(_) => 4,
-            // BoostedFees is new, no legacy format
+            // BoostedFees and SignedExclusiveSwap are new, no legacy format
             EkuboV3State::BoostedFees(_) => return,
         };
 
