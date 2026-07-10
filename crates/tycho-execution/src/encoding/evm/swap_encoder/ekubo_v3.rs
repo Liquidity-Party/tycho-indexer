@@ -15,6 +15,7 @@ use crate::encoding::{
 
 const SIGNED_USER_DATA_MIN_LEN: usize = 8 + 32 + 32; // fee + meta + minBalanceUpdate
 
+#[derive(Debug)]
 struct SignedSwapTail {
     fee: u64,
     meta: [u8; 32],
@@ -31,9 +32,10 @@ fn parse_signed_user_data(
     let Some(data) = user_data.as_ref() else {
         return Ok(None);
     };
-    if data.len() < SIGNED_USER_DATA_MIN_LEN {
+    if data.len() <= SIGNED_USER_DATA_MIN_LEN {
         return Err(EncodingError::InvalidInput(format!(
-            "signed user_data too short: {} bytes, need at least {SIGNED_USER_DATA_MIN_LEN}",
+            "signed user_data too short: {} bytes, need more than \
+             {SIGNED_USER_DATA_MIN_LEN} (signature must be non-empty)",
             data.len()
         )));
     }
@@ -145,6 +147,42 @@ mod tests {
 
     use super::*;
     use crate::encoding::{evm::utils::write_calldata_to_file, models::default_token};
+
+    #[test]
+    fn test_parse_signed_user_data_too_short() {
+        let data = Some(Bytes::from(vec![0u8; 71]));
+        let err = parse_signed_user_data(&data).unwrap_err();
+        assert!(matches!(err, EncodingError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn test_parse_signed_user_data_empty_signature() {
+        let mut buf = vec![0u8; 72];
+        buf[..8].copy_from_slice(&42u64.to_be_bytes());
+        buf[8..40].fill(0x11);
+        buf[40..72].fill(0x22);
+
+        let err = parse_signed_user_data(&Some(buf.into())).unwrap_err();
+        assert!(matches!(err, EncodingError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn test_parse_signed_user_data_with_signature() {
+        let sig = vec![0xAB, 0xCD, 0xEF];
+        let mut buf = vec![0u8; 72 + sig.len()];
+        buf[..8].copy_from_slice(&100u64.to_be_bytes());
+        buf[8..40].fill(0xAA);
+        buf[40..72].fill(0xBB);
+        buf[72..].copy_from_slice(&sig);
+
+        let tail = parse_signed_user_data(&Some(buf.into()))
+            .unwrap()
+            .expect("should parse");
+        assert_eq!(tail.fee, 100);
+        assert_eq!(tail.meta, [0xAA; 32]);
+        assert_eq!(tail.min_balance_update, [0xBB; 32]);
+        assert_eq!(tail.signature, sig);
+    }
 
     #[test]
     fn test_encode_swap_simple() {
