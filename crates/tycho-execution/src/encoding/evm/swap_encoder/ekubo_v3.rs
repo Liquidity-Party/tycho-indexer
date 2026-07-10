@@ -39,17 +39,13 @@ fn parse_signed_user_data(
             data.len()
         )));
     }
-    let fee = u64::from_be_bytes(
-        data[..8]
-            .try_into()
-            .map_err(|_| EncodingError::InvalidInput("fee should be 8 bytes".into()))?,
-    );
-    let meta: [u8; 32] = data[8..40]
-        .try_into()
-        .map_err(|_| EncodingError::InvalidInput("meta should be 32 bytes".into()))?;
-    let min_balance_update: [u8; 32] = data[40..72]
-        .try_into()
-        .map_err(|_| EncodingError::InvalidInput("minBalanceUpdate should be 32 bytes".into()))?;
+    let mut fee_bytes = [0u8; 8];
+    fee_bytes.copy_from_slice(&data[..8]);
+    let fee = u64::from_be_bytes(fee_bytes);
+    let mut meta = [0u8; 32];
+    meta.copy_from_slice(&data[8..40]);
+    let mut min_balance_update = [0u8; 32];
+    min_balance_update.copy_from_slice(&data[40..72]);
     let signature = data[72..].to_vec();
     Ok(Some(SignedSwapTail { fee, meta, min_balance_update, signature }))
 }
