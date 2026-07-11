@@ -249,7 +249,8 @@ contract TychoRouterTestSetup is
         fermiSwapExecutor = new FermiSwapExecutor(FERMI_SWAPPER);
         metricExecutor = new MetricExecutor(METRIC_ORACLE);
         bopAMMExecutor = new BopAMMExecutor(BOPAMM_SETTLEMENT);
-        ringSwapV2Executor = new RingSwapV2Executor(RING_FEW_FACTORY);
+        ringSwapV2Executor =
+            new RingSwapV2Executor(RING_FEW_FACTORY, RING_SWAP_FACTORY);
 
         address[] memory executors = new address[](25);
         executors[0] = address(usv2Executor);

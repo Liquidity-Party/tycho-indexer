@@ -222,6 +222,7 @@ contract Constants is
 
     // Ring Swap V2
     address RING_FEW_FACTORY = 0x7D86394139bf1122E82FDF45Bb4e3b038A4464DD;
+    address RING_SWAP_FACTORY = 0xeb2A625B704d73e82946D8d026E1F588Eed06416;
 
     // Angstrom hook address
     address ANGSTROM_HOOK = 0x0000000aa232009084Bd71A5797d089AA4Edfad4;

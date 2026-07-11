@@ -19,19 +19,35 @@ interface IFewFactory {
         returns (address);
 }
 
+interface IRingSwapV2Factory {
+    function getPair(address tokenA, address tokenB)
+        external
+        view
+        returns (address);
+}
+
 error RingSwapV2Executor__InvalidDataLength();
 error RingSwapV2Executor__InvalidFewToken(address token, address fwToken);
+error RingSwapV2Executor__InvalidPair(
+    address pair, address fwTokenIn, address fwTokenOut
+);
 error RingSwapV2Executor__ZeroFewFactory();
+error RingSwapV2Executor__ZeroRingSwapFactory();
 
 contract RingSwapV2Executor is IExecutor {
     uint256 private constant FEE_BPS = 30;
     address public immutable fewFactory;
+    address public immutable ringSwapFactory;
 
-    constructor(address fewFactory_) {
+    constructor(address fewFactory_, address ringSwapFactory_) {
         if (fewFactory_ == address(0)) {
             revert RingSwapV2Executor__ZeroFewFactory();
         }
+        if (ringSwapFactory_ == address(0)) {
+            revert RingSwapV2Executor__ZeroRingSwapFactory();
+        }
         fewFactory = fewFactory_;
+        ringSwapFactory = ringSwapFactory_;
     }
 
     function fundsExpectedAddress(
@@ -57,8 +73,7 @@ contract RingSwapV2Executor is IExecutor {
             address fwTokenOut
         ) = _decodeData(data);
 
-        _validateFewToken(tokenIn, fwTokenIn);
-        _validateFewToken(tokenOut, fwTokenOut);
+        _validateSwapData(target, tokenIn, tokenOut, fwTokenIn, fwTokenOut);
 
         uint256 fwAmountIn =
             IFewWrappedToken(fwTokenIn).wrapTo(amountIn, target);
@@ -94,6 +109,30 @@ contract RingSwapV2Executor is IExecutor {
     function _validateFewToken(address token, address fwToken) internal view {
         if (IFewFactory(fewFactory).getWrappedToken(token) != fwToken) {
             revert RingSwapV2Executor__InvalidFewToken(token, fwToken);
+        }
+    }
+
+    function _validateSwapData(
+        address target,
+        address tokenIn,
+        address tokenOut,
+        address fwTokenIn,
+        address fwTokenOut
+    ) internal view {
+        _validateFewToken(tokenIn, fwTokenIn);
+        _validateFewToken(tokenOut, fwTokenOut);
+        _validatePair(target, fwTokenIn, fwTokenOut);
+    }
+
+    function _validatePair(address pair, address fwTokenIn, address fwTokenOut)
+        internal
+        view
+    {
+        if (
+            IRingSwapV2Factory(ringSwapFactory).getPair(fwTokenIn, fwTokenOut)
+                != pair
+        ) {
+            revert RingSwapV2Executor__InvalidPair(pair, fwTokenIn, fwTokenOut);
         }
     }
 
@@ -142,11 +181,15 @@ contract RingSwapV2Executor is IExecutor {
         )
     {
         (
-            ,
+            address target,
             address decodedTokenIn,
             address decodedTokenOut,
             address fwTokenIn,
+            address fwTokenOut
         ) = _decodeData(data);
+        _validateSwapData(
+            target, decodedTokenIn, decodedTokenOut, fwTokenIn, fwTokenOut
+        );
         return (
             TransferManager.TransferType.ProtocolWillDebit,
             fwTokenIn,

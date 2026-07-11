@@ -7,8 +7,10 @@ import {TransferManager} from "@src/TransferManager.sol";
 import {
     RingSwapV2Executor,
     RingSwapV2Executor__InvalidFewToken,
+    RingSwapV2Executor__InvalidPair,
     RingSwapV2Executor__InvalidDataLength,
-    RingSwapV2Executor__ZeroFewFactory
+    RingSwapV2Executor__ZeroFewFactory,
+    RingSwapV2Executor__ZeroRingSwapFactory
 } from "@src/executors/RingSwapV2Executor.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
@@ -20,7 +22,9 @@ interface IFewWrappedTokenWithUnderlying {
 }
 
 contract RingSwapV2ExecutorExposed is RingSwapV2Executor {
-    constructor(address fewFactory_) RingSwapV2Executor(fewFactory_) {}
+    constructor(address fewFactory_, address ringSwapFactory_)
+        RingSwapV2Executor(fewFactory_, ringSwapFactory_)
+    {}
 
     function decodeParams(bytes calldata data)
         external
@@ -51,6 +55,7 @@ contract RingSwapV2ExecutorExposed is RingSwapV2Executor {
 
 contract RingSwapV2ExecutorTest is Constants, TestUtils {
     uint256 internal constant RING_FORK_BLOCK = 25283712;
+    uint256 internal constant RING_BACKING_REGRESSION_BLOCK = 20243446;
 
     address internal constant RING_WBTC_WETH_PAIR =
         0x00B06862dE00a7e67a2d6d3FbEEa592A32460de0;
@@ -60,6 +65,8 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         0x54222F404dcfAc705322045F01D100380b871450;
     address internal constant RING_DAI_WETH_PAIR =
         0x68C498Df05982d635914ee0Ae6501C749A78B473;
+    address internal constant RING_USDC_DAI_PAIR =
+        0x3CF3B56fE4c7c7bEe743B8675eC470E1b02Bb468;
     address internal constant FW_WBTC =
         0x2078f336Fdd260f708BEc4a20c82b063274E1b23;
     address internal constant FW_USDC =
@@ -75,16 +82,23 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), RING_FORK_BLOCK);
-        ringSwapV2Exposed = new RingSwapV2ExecutorExposed(RING_FEW_FACTORY);
+        ringSwapV2Exposed =
+            new RingSwapV2ExecutorExposed(RING_FEW_FACTORY, RING_SWAP_FACTORY);
     }
 
     function testConstructorConfig() public view {
         assertEq(ringSwapV2Exposed.fewFactory(), RING_FEW_FACTORY);
+        assertEq(ringSwapV2Exposed.ringSwapFactory(), RING_SWAP_FACTORY);
     }
 
     function testConstructorRevertsOnZeroFewFactory() public {
         vm.expectRevert(RingSwapV2Executor__ZeroFewFactory.selector);
-        new RingSwapV2ExecutorExposed(address(0));
+        new RingSwapV2ExecutorExposed(address(0), RING_SWAP_FACTORY);
+    }
+
+    function testConstructorRevertsOnZeroRingSwapFactory() public {
+        vm.expectRevert(RingSwapV2Executor__ZeroRingSwapFactory.selector);
+        new RingSwapV2ExecutorExposed(RING_FEW_FACTORY, address(0));
     }
 
     function testDecodeParams() public view {
@@ -176,6 +190,23 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         assertEq(outputToRouter, false);
     }
 
+    function testGetTransferDataRejectsUnofficialPair() public {
+        address maliciousPair = makeAddr("malicious-ring-pair");
+        bytes memory params = abi.encodePacked(
+            maliciousPair, DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidPair.selector,
+                maliciousPair,
+                FW_DAI,
+                FW_WETH
+            )
+        );
+        ringSwapV2Exposed.getTransferData(params);
+    }
+
     function testFundsExpectedAddressUsesRouterContext() public view {
         bytes memory params = abi.encodePacked(
             RING_DAI_WETH_PAIR, DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH
@@ -218,6 +249,66 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
             )
         );
         ringSwapV2Exposed.swap(100 ether, params, BOB);
+    }
+
+    function testSwapRejectsUnofficialPairBeforeWrapping() public {
+        uint256 amountIn = 100 ether;
+        address maliciousPair = makeAddr("malicious-ring-pair");
+        bytes memory params = abi.encodePacked(
+            maliciousPair, DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH
+        );
+
+        deal(DAI_ADDR, address(ringSwapV2Exposed), amountIn);
+        vm.prank(address(ringSwapV2Exposed));
+        IERC20(DAI_ADDR).approve(FW_DAI, amountIn);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidPair.selector,
+                maliciousPair,
+                FW_DAI,
+                FW_WETH
+            )
+        );
+        ringSwapV2Exposed.swap(amountIn, params, BOB);
+
+        assertEq(
+            IERC20(DAI_ADDR).balanceOf(address(ringSwapV2Exposed)), amountIn
+        );
+        assertEq(IERC20(FW_DAI).balanceOf(maliciousPair), 0);
+    }
+
+    function testSwapRevertsWhenOutputFewTokenUnderlyingBackingIsInsufficient()
+        public
+    {
+        vm.createSelectFork(vm.rpcUrl("mainnet"), RING_BACKING_REGRESSION_BLOCK);
+        RingSwapV2ExecutorExposed executor =
+            new RingSwapV2ExecutorExposed(RING_FEW_FACTORY, RING_SWAP_FACTORY);
+
+        (uint112 reserve0, uint112 reserve1,) =
+            IUniswapV2Pair(RING_USDC_DAI_PAIR).getReserves();
+        uint256 usdcBacking = IERC20(USDC_ADDR).balanceOf(FW_USDC);
+        assertLt(usdcBacking, reserve0);
+
+        // DAI is pair token1 and USDC is pair token0. Pick the smallest input whose normal V2
+        // output is greater than the USDC held by FW_USDC, so unwrapTo must fail.
+        uint256 amountIn = ((usdcBacking + 1) * uint256(reserve1) * 10_000)
+            / (9_970 * (uint256(reserve0) - usdcBacking - 1)) + 1;
+        uint256 expectedOut =
+            executor.getAmountOut(RING_USDC_DAI_PAIR, amountIn, false);
+        assertGt(expectedOut, usdcBacking);
+
+        deal(DAI_ADDR, address(executor), amountIn);
+        vm.prank(address(executor));
+        IERC20(DAI_ADDR).approve(FW_DAI, amountIn);
+
+        bytes memory params = abi.encodePacked(
+            RING_USDC_DAI_PAIR, DAI_ADDR, USDC_ADDR, FW_DAI, FW_USDC
+        );
+        (bool success,) = address(executor)
+            .call(abi.encodeCall(executor.swap, (amountIn, params, BOB)));
+
+        assertFalse(success);
     }
 
     function testSwapWbtcForWethWrapsSwapsAndUnwraps() public {
@@ -280,6 +371,9 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         assertGt(expectedAmountOut, 0);
         assertEq(balanceAfter - balanceBefore, expectedAmountOut);
         assertEq(IERC20(tokenIn).balanceOf(address(ringSwapV2Exposed)), 0);
+        assertEq(
+            IERC20(tokenIn).allowance(address(ringSwapV2Exposed), fwTokenIn), 0
+        );
         assertEq(IERC20(fwTokenIn).balanceOf(address(ringSwapV2Exposed)), 0);
         assertEq(IERC20(fwTokenOut).balanceOf(address(ringSwapV2Exposed)), 0);
     }
@@ -316,6 +410,7 @@ contract TychoRouterForRingSwapV2Test is TychoRouterTestSetup {
         assertGt(amountOut, 0);
         assertEq(IERC20(DAI_ADDR).balanceOf(ALICE), 0);
         assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(DAI_ADDR).allowance(tychoRouterAddr, FW_DAI), 0);
         assertEq(IERC20(FW_DAI).balanceOf(tychoRouterAddr), 0);
         assertEq(IERC20(FW_WETH).balanceOf(tychoRouterAddr), 0);
     }
@@ -339,8 +434,71 @@ contract TychoRouterForRingSwapV2Test is TychoRouterTestSetup {
         assertEq(IERC20(USDC_ADDR).balanceOf(ALICE), 0);
         assertEq(IERC20(USDC_ADDR).balanceOf(tychoRouterAddr), 0);
         assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(DAI_ADDR).allowance(tychoRouterAddr, FW_DAI), 0);
         assertEq(IERC20(FW_DAI).balanceOf(tychoRouterAddr), 0);
         assertEq(IERC20(FW_WETH).balanceOf(tychoRouterAddr), 0);
         assertEq(IERC20(WETH_ADDR).balanceOf(tychoRouterAddr), 0);
+    }
+
+    function testSingleSwapRejectsUnofficialRingPairWithoutLeavingApproval()
+        public
+    {
+        uint256 amountIn = 100 ether;
+        address maliciousPair = makeAddr("malicious-ring-pair");
+        bytes memory protocolData = abi.encodePacked(
+            maliciousPair, DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH
+        );
+        bytes memory swap =
+            encodeSingleSwap(address(ringSwapV2Executor), protocolData);
+
+        deal(DAI_ADDR, ALICE, amountIn);
+        vm.startPrank(ALICE);
+        IERC20(DAI_ADDR).approve(tychoRouterAddr, amountIn);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidPair.selector,
+                maliciousPair,
+                FW_DAI,
+                FW_WETH
+            )
+        );
+        tychoRouter.singleSwap(
+            amountIn, DAI_ADDR, WETH_ADDR, 1, ALICE, noClientFee(), swap
+        );
+        vm.stopPrank();
+
+        assertEq(IERC20(DAI_ADDR).balanceOf(ALICE), amountIn);
+        assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(DAI_ADDR).allowance(tychoRouterAddr, FW_DAI), 0);
+        assertEq(IERC20(FW_DAI).balanceOf(maliciousPair), 0);
+    }
+
+    function testSingleSwapRejectsFakeFewTokenWithoutLeavingApproval() public {
+        uint256 amountIn = 100 ether;
+        address fakeFewToken = makeAddr("fake-few-token");
+        bytes memory protocolData = abi.encodePacked(
+            RING_DAI_WETH_PAIR, DAI_ADDR, WETH_ADDR, fakeFewToken, FW_WETH
+        );
+        bytes memory swap =
+            encodeSingleSwap(address(ringSwapV2Executor), protocolData);
+
+        deal(DAI_ADDR, ALICE, amountIn);
+        vm.startPrank(ALICE);
+        IERC20(DAI_ADDR).approve(tychoRouterAddr, amountIn);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidFewToken.selector,
+                DAI_ADDR,
+                fakeFewToken
+            )
+        );
+        tychoRouter.singleSwap(
+            amountIn, DAI_ADDR, WETH_ADDR, 1, ALICE, noClientFee(), swap
+        );
+        vm.stopPrank();
+
+        assertEq(IERC20(DAI_ADDR).balanceOf(ALICE), amountIn);
+        assertEq(IERC20(DAI_ADDR).balanceOf(tychoRouterAddr), 0);
+        assertEq(IERC20(DAI_ADDR).allowance(tychoRouterAddr, fakeFewToken), 0);
     }
 }

@@ -233,22 +233,40 @@ impl Executor {
                 )?,
                 output_to_router: false,
             }),
-            Self::RingSwapV2 => Ok(TransferData {
-                transfer_type: TransferType::ProtocolWillDebit,
-                receiver: params.request(
+            Self::RingSwapV2 => {
+                let pool = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    Address::SENDER_CONTROLLED,
+                )?;
+                let fw_token_in = params.request(
                     ParamKey::ProtocolData { swap_index, start: 60, end: 80 },
                     Address::VARIANTS,
-                )?,
-                token_in: params.request(
-                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
-                    Address::POSSIBLY_ERC20_AND_NATIVE,
-                )?,
-                token_out: params.request(
-                    ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
-                    Address::POSSIBLY_ERC20_AND_NATIVE,
-                )?,
-                output_to_router: false,
-            }),
+                )?;
+                let fw_token_out = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 80, end: 100 },
+                    Address::VARIANTS,
+                )?;
+                if fw_token_in.is_sender_controlled() || fw_token_out.is_sender_controlled() {
+                    return Err(Error::revert("RingSwapV2.getTransferData: invalid FewToken"));
+                }
+                if pool.is_sender_controlled() {
+                    return Err(Error::revert("RingSwapV2.getTransferData: invalid pair"));
+                }
+
+                Ok(TransferData {
+                    transfer_type: TransferType::ProtocolWillDebit,
+                    receiver: fw_token_in,
+                    token_in: params.request(
+                        ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                        Address::POSSIBLY_ERC20_AND_NATIVE,
+                    )?,
+                    token_out: params.request(
+                        ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
+                        Address::POSSIBLY_ERC20_AND_NATIVE,
+                    )?,
+                    output_to_router: false,
+                })
+            }
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L81
             Self::UniswapV3 => Ok(TransferData {
                 transfer_type: TransferType::None,
@@ -548,27 +566,12 @@ impl Executor {
                 }
 
                 if pool.is_sender_controlled() {
-                    let token_in = params.request(
-                        ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
-                        Address::VARIANTS,
-                    )?;
-                    state.erc20_safe_transfer_from(
-                        token_in,
-                        fw_token_in,
-                        Address::Router,
-                        fw_token_in,
-                        amount,
-                    )?;
-                    state.erc20_safe_transfer(fw_token_in, fw_token_in, pool, amount)?;
-
-                    // if the sender controls the pool,
-                    // the actual swap logic doesn't matter
-                    Ok(())
-                } else {
-                    Err(Error::Ignore {
-                        reason: "ringswapv2 pool not sender controlled. not low hanging fruit. would require simulating real pool".into(),
-                    })
+                    return Err(Error::revert("RingSwapV2.swap: invalid pair"));
                 }
+
+                Err(Error::Ignore {
+                    reason: "ringswapv2 pool not sender controlled. not low hanging fruit. would require simulating real pool".into(),
+                })
             }
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L37
             Self::UniswapV3 => {
