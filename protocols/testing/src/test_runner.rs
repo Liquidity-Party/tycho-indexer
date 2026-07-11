@@ -77,6 +77,19 @@ static CLONE_TO_BASE_PROTOCOL: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| 
     ])
 });
 
+fn has_executable_liquidity(max_input: &BigUint, max_output: &BigUint) -> bool {
+    !max_input.is_zero() && !max_output.is_zero()
+}
+
+fn ensure_execution_successes(success_count: usize, failure_count: usize) -> miette::Result<()> {
+    if failure_count > 0 {
+        return Err(miette!(
+            "Execution validation failed: {success_count} successes, {failure_count} failures"
+        ));
+    }
+    Ok(())
+}
+
 pub enum TestType {
     Full(TestTypeFull),
     Range(TestTypeRange),
@@ -1078,6 +1091,14 @@ impl TestRunner {
                     id, token_in.symbol, token_out.symbol
                 );
 
+                if !has_executable_liquidity(&max_input, &max_output) {
+                    info!(
+                        "[{}] Skipping {} -> {}: no executable liquidity within the reported limits",
+                        id, token_in.symbol, token_out.symbol
+                    );
+                    continue;
+                }
+
                 for percentage in percentages.iter() {
                     // For precision, multiply by 1000 then divide by 1000
                     let percentage_biguint = BigUint::from((percentage * 1000.0) as u32);
@@ -1323,7 +1344,7 @@ impl TestRunner {
 
         info!("Batch execution complete: {} successes, {} failures", success_count, failure_count);
 
-        Ok(())
+        ensure_execution_successes(success_count, failure_count)
     }
 
     /// Validate that the token balances of the components match the values
@@ -1420,6 +1441,19 @@ mod tests {
     use tycho_simulation::tycho_common::{models::protocol::ProtocolComponentState, Bytes};
 
     use super::*;
+
+    #[test]
+    fn zero_limit_direction_is_not_executable() {
+        assert!(!has_executable_liquidity(&BigUint::from(0u8), &BigUint::from(1u8)));
+        assert!(!has_executable_liquidity(&BigUint::from(1u8), &BigUint::from(0u8)));
+        assert!(has_executable_liquidity(&BigUint::from(1u8), &BigUint::from(1u8)));
+    }
+
+    #[test]
+    fn execution_failure_is_returned_to_the_range_runner() {
+        assert!(ensure_execution_successes(1, 0).is_ok());
+        assert!(ensure_execution_successes(1, 1).is_err());
+    }
 
     #[test]
     fn test_parse_all_configs() {
