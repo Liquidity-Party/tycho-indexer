@@ -7,6 +7,7 @@ protobuf:
   files:
     - tycho/evm/v1/common.proto
     - tycho/evm/v1/entity.proto
+    - tycho/evm/v1/utils.proto
   importPaths:
     - ../../../proto/
 
@@ -33,6 +34,34 @@ modules:
     inputs:
       - map: map_pools_created
 
+  - name: store_few_wrappers
+    kind: store
+    initialBlock: 20231667
+    updatePolicy: set_if_not_exists
+    valueType: string
+    inputs:
+      - map: map_pools_created
+
+  - name: map_wrapper_backing_deltas
+    kind: map
+    initialBlock: 20231667
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - store: store_few_wrappers
+        mode: deltas
+      - store: store_few_wrappers
+        mode: get
+    output:
+      type: proto:tycho.evm.v1.BlockBalanceDeltas
+
+  - name: store_wrapper_backings
+    kind: store
+    initialBlock: 20231667
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - map: map_wrapper_backing_deltas
+
   - name: map_pool_events
     kind: map
     initialBlock: 20231667
@@ -40,6 +69,9 @@ modules:
       - source: sf.ethereum.type.v2.Block
       - map: map_pools_created
       - store: store_pools
+      - map: map_wrapper_backing_deltas
+      - store: store_wrapper_backings
+        mode: deltas
     output:
       type: proto:tycho.evm.v1.BlockChanges
 

@@ -15,7 +15,7 @@ impl HasAddresser for PoolAddresser<'_> {
     fn has_address(&self, key: Address) -> bool {
         let pool = self
             .store
-            .get_last(StoreKey::Pool.get_unique_pool_key(&key.to_hex()));
+            .get_last(StoreKey::Pool.get_unique_key(&key.to_hex()));
 
         pool.is_some()
     }

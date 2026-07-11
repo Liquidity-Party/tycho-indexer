@@ -836,6 +836,13 @@ where
                                     .cloned()
                                     .unwrap_or_default(),
                             );
+                            pools_to_update.extend(
+                                state_guard
+                                    .contracts_map
+                                    .get(account)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            );
                             (account.clone(), balances)
                         })
                         .collect(),

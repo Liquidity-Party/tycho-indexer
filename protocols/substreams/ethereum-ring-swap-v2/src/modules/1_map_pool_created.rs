@@ -74,7 +74,10 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
             component_changes: vec![ProtocolComponent {
                 id: event.pair.to_hex(),
                 tokens: tokens.component_tokens.clone(),
-                contracts: vec![],
+                // The pair stores FewTokens, but solver-facing components use the underlying
+                // ERC-20s. Track both wrappers as related contracts so their backing balances
+                // trigger a Ring state refresh.
+                contracts: vec![tokens.fw_token0.clone(), tokens.fw_token1.clone()],
                 static_att: static_attributes(&event, &tokens),
                 change: i32::from(ChangeType::Creation),
                 protocol_type: Some(ProtocolType {

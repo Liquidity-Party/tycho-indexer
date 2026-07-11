@@ -3,9 +3,10 @@ use tycho_simulation::{
         engine_db::tycho_db::PreCachedDB,
         protocol::{
             ekubo::state::EkuboState, fluid::FluidV1, lunarbase::LunarBaseState,
-            pancakeswap_v2::state::PancakeswapV2State, rocketpool::state::RocketpoolState,
-            uniswap_v2::state::UniswapV2State, uniswap_v3::state::UniswapV3State,
-            uniswap_v4::state::UniswapV4State, vm::state::EVMPoolState,
+            pancakeswap_v2::state::PancakeswapV2State, ring_swap_v2::state::RingSwapV2State,
+            rocketpool::state::RocketpoolState, uniswap_v2::state::UniswapV2State,
+            uniswap_v3::state::UniswapV3State, uniswap_v4::state::UniswapV4State,
+            vm::state::EVMPoolState,
         },
         stream::ProtocolStreamBuilder,
     },
@@ -25,13 +26,19 @@ pub fn register_protocol(
     let tvl = chain.default_tvl_threshold(TvlThresholdTier::Medium);
     let tvl_filter = ComponentFilter::with_tvl_range(tvl, tvl);
     let stream_builder = match protocol_system {
-        "uniswap_v2" | "sushiswap_v2" | "ring_swap_v2" => stream_builder
+        "uniswap_v2" | "sushiswap_v2" => stream_builder
             .exchange_with_decoder_context::<UniswapV2State>(
                 protocol_system,
                 tvl_filter,
                 None,
                 decoder_context,
             ),
+        "ring_swap_v2" => stream_builder.exchange_with_decoder_context::<RingSwapV2State>(
+            protocol_system,
+            tvl_filter,
+            None,
+            decoder_context,
+        ),
         "pancakeswap_v2" => stream_builder.exchange_with_decoder_context::<PancakeswapV2State>(
             protocol_system,
             tvl_filter,

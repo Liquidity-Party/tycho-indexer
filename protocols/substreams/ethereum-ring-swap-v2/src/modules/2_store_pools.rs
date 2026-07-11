@@ -15,7 +15,7 @@ pub fn store_pools(
             //  Use ordinal 0 because the address should be unique, so ordering doesn't matter.
             store.set_if_not_exists(
                 0,
-                StoreKey::Pool.get_unique_pool_key(&new_protocol_component.id),
+                StoreKey::Pool.get_unique_key(&new_protocol_component.id),
                 &new_protocol_component,
             );
         }
