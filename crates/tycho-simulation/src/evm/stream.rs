@@ -460,6 +460,24 @@ impl ProtocolStreamBuilder {
         self
     }
 
+    /// Adds client-metadata entries forwarded to the server in the `X-Tycho-Client-Metadata`
+    /// header.
+    ///
+    /// See [`TychoStreamBuilder::add_client_metadata`]. Values are self-reported and may surface in
+    /// the server's metrics and logs — do not include secrets or personally identifiable
+    /// information.
+    pub fn add_client_metadata<I, K, V>(mut self, metadata: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.stream_builder = self
+            .stream_builder
+            .add_client_metadata(metadata);
+        self
+    }
+
     /// Disables TLS/ SSL for the connection, using http and ws protocols.
     ///
     /// This is not recommended for production use.
