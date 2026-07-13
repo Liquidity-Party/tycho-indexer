@@ -1,23 +1,16 @@
 use crate::{
-    abi::dynamic_swap_fee_module::events::{
-        CustomFeeSet, DynamicFeeReset, FeeCapSet, ScalingFactorSet,
-    },
     events::get_log_changed_attributes,
-    modules::utils::Params,
+    modules::utils::{DynamicFeeEvent, Params},
     pb::tycho::evm::aerodrome::Pool,
 };
 
 use itertools::Itertools;
-use num_bigint::BigInt;
 use std::{collections::HashMap, vec};
 use substreams::{
     pb::substreams::StoreDeltas,
-    store::{StoreGet, StoreGetProto},
+    store::{StoreGet, StoreGetBigInt, StoreGetProto},
 };
-use substreams_ethereum::{
-    pb::eth::v2::{self as eth},
-    Event,
-};
+use substreams_ethereum::pb::eth::v2::{self as eth};
 use substreams_helper::hex::Hexable;
 use tycho_substreams::{balances::aggregate_balances_changes, prelude::*};
 
@@ -27,6 +20,7 @@ pub fn map_protocol_changes(
     block: eth::Block,
     protocol_components: BlockChanges,
     pools_store: StoreGetProto<Pool>,
+    dynamic_fee_config_store: StoreGetBigInt,
     balance_store: StoreDeltas,
     balance_deltas: BlockBalanceDeltas,
 ) -> Result<BlockChanges, substreams::errors::Error> {
@@ -103,61 +97,44 @@ pub fn map_protocol_changes(
                 }
             }
             if dynamic_fee_modules.contains(&log.address) {
-                let mut handle_event = |pool: &Vec<u8>, attrs: Vec<Attribute>| {
+                let mut handle_event = |pool: &[u8]| {
                     let pool_key = format!("Pool:{}", pool.to_hex());
                     if pools_store
                         .get_last(&pool_key)
                         .is_some()
                     {
+                        // Every configured-module event publishes a complete versioned snapshot.
+                        // Fields absent from the module store are zero-valued contract defaults.
+                        let attributes = [
+                            "dfc_baseFee",
+                            "dfc_scalingFactor",
+                            "dfc_feeCap",
+                            "dfc_initialFeeEnabled",
+                            "dfc_initialFee",
+                        ]
+                        .into_iter()
+                        .map(|attribute| Attribute {
+                            name: attribute.into(),
+                            value: dynamic_fee_config_store
+                                .get_at(log.ordinal, format!("{}:{attribute}", pool.to_hex()))
+                                .unwrap_or_default()
+                                .to_signed_bytes_be(),
+                            change: ChangeType::Update.into(),
+                        })
+                        .chain(std::iter::once(Attribute {
+                            name: "dynamic_fee_module".into(),
+                            value: log.address.clone(),
+                            change: ChangeType::Update.into(),
+                        }))
+                        .collect();
                         builder.add_entity_change(&EntityChanges {
                             component_id: pool.to_hex(),
-                            attributes: attrs,
+                            attributes,
                         });
                     }
                 };
-                if let Some(e) = CustomFeeSet::match_and_decode(log) {
-                    handle_event(
-                        &e.pool.clone(),
-                        vec![Attribute {
-                            name: "dfc_baseFee".into(),
-                            value: e.fee.to_signed_bytes_be(),
-                            change: ChangeType::Update.into(),
-                        }],
-                    );
-                } else if let Some(e) = ScalingFactorSet::match_and_decode(log) {
-                    handle_event(
-                        &e.pool.clone(),
-                        vec![Attribute {
-                            name: "dfc_scalingFactor".into(),
-                            value: e.scaling_factor.to_signed_bytes_be(),
-                            change: ChangeType::Update.into(),
-                        }],
-                    );
-                } else if let Some(e) = FeeCapSet::match_and_decode(log) {
-                    handle_event(
-                        &e.pool.clone(),
-                        vec![Attribute {
-                            name: "dfc_feeCap".into(),
-                            value: e.fee_cap.to_signed_bytes_be(),
-                            change: ChangeType::Update.into(),
-                        }],
-                    );
-                } else if let Some(e) = DynamicFeeReset::match_and_decode(log) {
-                    handle_event(
-                        &e.pool.clone(),
-                        vec![
-                            Attribute {
-                                name: "dfc_scalingFactor".into(),
-                                value: BigInt::from(0).to_signed_bytes_be(),
-                                change: ChangeType::Update.into(),
-                            },
-                            Attribute {
-                                name: "dfc_feeCap".into(),
-                                value: BigInt::from(0).to_signed_bytes_be(),
-                                change: ChangeType::Update.into(),
-                            },
-                        ],
-                    );
+                if let Some(event) = DynamicFeeEvent::match_and_decode(log) {
+                    handle_event(event.pool());
                 }
             }
         }
