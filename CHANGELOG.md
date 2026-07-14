@@ -1,3 +1,26 @@
+## [0.334.0](https://github.com/propeller-heads/tycho/compare/0.333.1...0.334.0) (2026-07-13)
+
+
+### Features
+
+* extend Ekubo V3 signed swap executor and encoder ([#1167](https://github.com/propeller-heads/tycho/issues/1167)) ([3d6a94f](https://github.com/propeller-heads/tycho/commit/3d6a94fc39f3699f66203f78d1fd3071f413dc74))
+* implement signed exclusive swap in EkuboV3 executor and encoder ([09bf7c6](https://github.com/propeller-heads/tycho/commit/09bf7c6a0853ce453ee321ab9af7b2d8da379d45))
+* scaffold Ekubo V3 signed swap executor and encoder ([33268b9](https://github.com/propeller-heads/tycho/commit/33268b9a1e4aa8e9c8e54faebd0ba606d98cf60a))
+
+
+### Bug Fixes
+
+* Add Polygon to dev CI ([31cee12](https://github.com/propeller-heads/tycho/commit/31cee1278cb09f5089d25ae1cdafbf862ba6960b))
+* address review on incremental transaction cleanup ([bc966a1](https://github.com/propeller-heads/tycho/commit/bc966a1035e03c97962d81f67df23a311468725a))
+* replace transaction cleanup with lock-safe incremental procedure ([e5664e9](https://github.com/propeller-heads/tycho/commit/e5664e925887d05a9cfe76e62073373a61e849d0))
+* replace transaction cleanup with lock-safe incremental procedure ([#1157](https://github.com/propeller-heads/tycho/issues/1157)) ([c57f532](https://github.com/propeller-heads/tycho/commit/c57f5320f17e49851343794a08e3455536ed230a))
+* unpin evm version ([5767323](https://github.com/propeller-heads/tycho/commit/576732303bb2622dec96dc64d36084e4bbc6cfbb))
+
+
+### Reverts
+
+* Revert "fix: unpin evm version" ([cf66eaa](https://github.com/propeller-heads/tycho/commit/cf66eaa8654843fbb07939751de1d331e4ce9f9b))
+
 ## [0.333.1](https://github.com/propeller-heads/tycho/compare/0.333.0...0.333.1) (2026-07-10)
 
 
