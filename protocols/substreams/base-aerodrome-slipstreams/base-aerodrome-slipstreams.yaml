@@ -90,6 +90,8 @@ modules:
       - map: map_pools_created
       - store: store_pools
       - store: store_dynamic_fee_config
+        mode: deltas
+      - store: store_dynamic_fee_config
       - store: store_pools_balances
         mode: deltas
       - map: map_balance_changes

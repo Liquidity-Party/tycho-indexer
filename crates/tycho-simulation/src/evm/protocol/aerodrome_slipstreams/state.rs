@@ -712,6 +712,25 @@ mod tests {
     }
 
     #[test]
+    fn applies_partial_dynamic_fee_updates_after_module_initialization() {
+        let mut pool = create_basic_test_pool();
+        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
+        let delta = ProtocolStateDelta {
+            component_id: "test-pool".to_string(),
+            updated_attributes: HashMap::from([(
+                "dfc_baseFee".to_string(),
+                Bytes::from(500_u32.to_be_bytes()),
+            )]),
+            ..Default::default()
+        };
+
+        pool.delta_transition(delta, &HashMap::new(), &Balances::default())
+            .expect("partial dynamic fee update should be valid");
+
+        assert_eq!(pool.dfc, DynamicFeeConfig::new(500, 10_000, 1, false, 0));
+    }
+
+    #[test]
     fn test_partial_step_updates_tick_when_price_moves_without_crossing_initialized_tick() {
         let pool = create_basic_test_pool();
         let amount =

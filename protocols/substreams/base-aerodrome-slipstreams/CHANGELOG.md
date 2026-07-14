@@ -14,9 +14,14 @@
 - Add support for the upgraded dynamic fee configuration fields
   `dfc_initialFeeEnabled` and `dfc_initialFee`, including the corresponding set, disable, and
   reset events.
-- Accumulate dynamic fee events in a Substreams store and emit a complete five-field dynamic fee
-  configuration on every event from a configured module. This prevents attributes left by a
-  previous module from being combined with a partial update from the current module.
+- Accumulate events from the statically configured fee modules in a Substreams store keyed by pool
+  and attribute. The first event observed for a pool emits all five configuration fields together
+  with `dynamic_fee_module`, explicitly replacing any stale database attributes left by a retired
+  module. Later events emit only the fields changed by that event. Pools configured before the
+  SPKG cutover receive their complete initial snapshot from the backfill described below. Store
+  keys deliberately omit the module address because module rotation is handled as a static SPKG
+  configuration upgrade plus backfill, not as a runtime transition between modules for the same
+  pool.
 - Add the `dynamic_fee_module` pool attribute as a version marker. Tycho Simulation only applies
   dynamic fee attributes when this marker matches one of the two configured modules above;
   missing or unsupported markers fall back to the module defaults.

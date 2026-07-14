@@ -305,7 +305,7 @@ mod tests {
         .await
         .expect("stale snapshots should remain decodable");
 
-        assert_eq!(decoded, expected_state(DynamicFeeConfig::new(0, 0, 0, false, 0)));
+        assert_eq!(decoded, expected_state(DynamicFeeConfig::default()));
     }
 
     #[rstest]

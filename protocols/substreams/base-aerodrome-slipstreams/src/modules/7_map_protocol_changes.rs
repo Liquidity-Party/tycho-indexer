@@ -1,6 +1,9 @@
 use crate::{
     events::get_log_changed_attributes,
-    modules::utils::{DynamicFeeEvent, Params},
+    modules::utils::{
+        dynamic_fee_config_initialized_key, dynamic_fee_config_key, DynamicFeeEvent, Params,
+        DYNAMIC_FEE_CONFIG_ATTRIBUTES,
+    },
     pb::tycho::evm::aerodrome::Pool,
 };
 
@@ -14,12 +17,25 @@ use substreams_ethereum::pb::eth::v2::{self as eth};
 use substreams_helper::hex::Hexable;
 use tycho_substreams::{balances::aggregate_balances_changes, prelude::*};
 
+fn is_first_dynamic_fee_config_event(
+    deltas: &StoreDeltas,
+    ordinal: u64,
+    pool: &[u8],
+) -> bool {
+    deltas.deltas.iter().any(|delta| {
+        delta.ordinal == ordinal
+            && delta.key == dynamic_fee_config_initialized_key(pool)
+            && delta.old_value.is_empty()
+    })
+}
+
 #[substreams::handlers::map]
 pub fn map_protocol_changes(
     params: String,
     block: eth::Block,
     protocol_components: BlockChanges,
     pools_store: StoreGetProto<Pool>,
+    dynamic_fee_config_deltas: StoreDeltas,
     dynamic_fee_config_store: StoreGetBigInt,
     balance_store: StoreDeltas,
     balance_deltas: BlockBalanceDeltas,
@@ -97,26 +113,37 @@ pub fn map_protocol_changes(
                 }
             }
             if dynamic_fee_modules.contains(&log.address) {
-                let mut handle_event = |pool: &[u8]| {
-                    let pool_key = format!("Pool:{}", pool.to_hex());
-                    if pools_store
-                        .get_last(&pool_key)
-                        .is_some()
-                    {
-                        // Every configured-module event publishes a complete versioned snapshot.
-                        // Fields absent from the module store are zero-valued contract defaults.
-                        let attributes = [
-                            "dfc_baseFee",
-                            "dfc_scalingFactor",
-                            "dfc_feeCap",
-                            "dfc_initialFeeEnabled",
-                            "dfc_initialFee",
-                        ]
+                let Some(event) = DynamicFeeEvent::match_and_decode(log) else {
+                    continue;
+                };
+                let pool = event.pool();
+                let pool_key = format!("Pool:{}", pool.to_hex());
+                if pools_store
+                    // store_pools writes current-block creations at ordinal zero, so get_at also
+                    // recognizes a pool whose first fee event occurs in its creation block.
+                    .get_at(log.ordinal, &pool_key)
+                    .is_none()
+                {
+                    continue;
+                }
+
+                let is_first_event = is_first_dynamic_fee_config_event(
+                    &dynamic_fee_config_deltas,
+                    log.ordinal,
+                    pool,
+                );
+                let attributes = if is_first_event {
+                    // The backfill gives every pool configured before the cutover a complete
+                    // current-module snapshot. If a previously untouched pool receives its first
+                    // event afterwards, its database row may still contain attributes from the
+                    // retired module. Emit all fields with the new module marker once so absent
+                    // current-module fields explicitly replace those stale values with zero.
+                    DYNAMIC_FEE_CONFIG_ATTRIBUTES
                         .into_iter()
                         .map(|attribute| Attribute {
                             name: attribute.into(),
                             value: dynamic_fee_config_store
-                                .get_at(log.ordinal, format!("{}:{attribute}", pool.to_hex()))
+                                .get_at(log.ordinal, dynamic_fee_config_key(pool, attribute))
                                 .unwrap_or_default()
                                 .to_signed_bytes_be(),
                             change: ChangeType::Update.into(),
@@ -126,16 +153,20 @@ pub fn map_protocol_changes(
                             value: log.address.clone(),
                             change: ChangeType::Update.into(),
                         }))
-                        .collect();
-                        builder.add_entity_change(&EntityChanges {
-                            component_id: pool.to_hex(),
-                            attributes,
-                        });
-                    }
+                        .collect()
+                } else {
+                    event
+                        .config_updates()
+                        .into_iter()
+                        .map(|(attribute, value)| Attribute {
+                            name: attribute.into(),
+                            value: value.to_signed_bytes_be(),
+                            change: ChangeType::Update.into(),
+                        })
+                        .collect()
                 };
-                if let Some(event) = DynamicFeeEvent::match_and_decode(log) {
-                    handle_event(event.pool());
-                }
+                builder
+                    .add_entity_change(&EntityChanges { component_id: pool.to_hex(), attributes });
             }
         }
     }
@@ -149,4 +180,31 @@ pub fn map_protocol_changes(
             .collect::<Vec<_>>(),
         storage_changes: vec![],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use substreams::pb::substreams::{StoreDelta, StoreDeltas};
+
+    use super::{dynamic_fee_config_initialized_key, is_first_dynamic_fee_config_event};
+
+    #[test]
+    fn only_the_first_pool_event_requests_a_complete_snapshot() {
+        let pool = [0x33; 20];
+        let mut deltas = StoreDeltas {
+            deltas: vec![StoreDelta {
+                ordinal: 42,
+                key: dynamic_fee_config_initialized_key(&pool),
+                old_value: Vec::new(),
+                new_value: b"1".to_vec(),
+                ..Default::default()
+            }],
+        };
+
+        assert!(is_first_dynamic_fee_config_event(&deltas, 42, &pool));
+        assert!(!is_first_dynamic_fee_config_event(&deltas, 43, &pool));
+
+        deltas.deltas[0].old_value = b"1".to_vec();
+        assert!(!is_first_dynamic_fee_config_event(&deltas, 42, &pool));
+    }
 }

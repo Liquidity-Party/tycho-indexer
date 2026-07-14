@@ -26,6 +26,7 @@ pub struct DynamicFeeConfig {
     scaling_factor: u64,
     initial_fee_enabled: bool,
     initial_fee: u32,
+    module_is_supported: bool,
 }
 
 fn is_supported_dynamic_fee_module(fee_module: &[u8]) -> bool {
@@ -42,7 +43,14 @@ impl DynamicFeeConfig {
         initial_fee_enabled: bool,
         initial_fee: u32,
     ) -> Self {
-        Self { base_fee, fee_cap, scaling_factor, initial_fee_enabled, initial_fee }
+        Self {
+            base_fee,
+            fee_cap,
+            scaling_factor,
+            initial_fee_enabled,
+            initial_fee,
+            module_is_supported: true,
+        }
     }
     pub(crate) fn from_attributes(
         attributes: &HashMap<String, Bytes>,
@@ -81,6 +89,7 @@ impl DynamicFeeConfig {
                 .cloned()
                 .map(u32::from)
                 .unwrap_or_default(),
+            module_is_supported: true,
         })
     }
 
@@ -90,6 +99,28 @@ impl DynamicFeeConfig {
     ) -> Result<(), &'static str> {
         if attributes.contains_key(DYNAMIC_FEE_MODULE_ATTRIBUTE) {
             *self = Self::from_attributes(attributes)?;
+            return Ok(());
+        }
+        if !self.module_is_supported {
+            return Ok(());
+        }
+
+        if let Some(base_fee) = attributes.get("dfc_baseFee") {
+            self.base_fee = u32::from(base_fee.clone());
+        }
+        if let Some(fee_cap) = attributes.get("dfc_feeCap") {
+            self.fee_cap = u32::from(fee_cap.clone());
+        }
+        if let Some(scaling_factor) = attributes.get("dfc_scalingFactor") {
+            self.scaling_factor = u64::from(scaling_factor.clone());
+        }
+        if let Some(initial_fee_enabled) = attributes.get("dfc_initialFeeEnabled") {
+            self.initial_fee_enabled = initial_fee_enabled
+                .iter()
+                .any(|byte| *byte != 0);
+        }
+        if let Some(initial_fee) = attributes.get("dfc_initialFee") {
+            self.initial_fee = u32::from(initial_fee.clone());
         }
         Ok(())
     }
@@ -273,5 +304,50 @@ mod tests {
                 .expect("Failed to calculate dynamic fee");
 
         assert_eq!(dynamic_fee, 380);
+    }
+
+    #[test]
+    fn applies_partial_config_updates_without_replacing_unchanged_fields() {
+        let mut config = DynamicFeeConfig::new(100, 1_000, 5_000_000, true, 50);
+
+        config
+            .update_from_attributes(&HashMap::from([(
+                "dfc_baseFee".to_string(),
+                Bytes::from(200_u32.to_be_bytes()),
+            )]))
+            .expect("partial dynamic fee update should be valid");
+
+        assert_eq!(config, DynamicFeeConfig::new(200, 1_000, 5_000_000, true, 50));
+    }
+
+    #[test]
+    fn ignores_partial_updates_until_a_supported_module_initializes_the_config() {
+        let mut config = DynamicFeeConfig::from_attributes(&HashMap::from([(
+            DYNAMIC_FEE_MODULE_ATTRIBUTE.to_string(),
+            Bytes::from([0x11; 20]),
+        )]))
+        .expect("unsupported module should fall back to defaults");
+
+        config
+            .update_from_attributes(&HashMap::from([(
+                "dfc_baseFee".to_string(),
+                Bytes::from(200_u32.to_be_bytes()),
+            )]))
+            .expect("ignored partial update should remain valid");
+
+        assert_eq!(config, DynamicFeeConfig::default());
+    }
+
+    #[test]
+    fn serialized_config_requires_explicit_module_support_state() {
+        let config = DynamicFeeConfig::new(100, 1_000, 5_000_000, false, 0);
+        let mut serialized = serde_json::to_value(config).expect("config should serialize");
+
+        serialized
+            .as_object_mut()
+            .expect("serialized config should be an object")
+            .remove("module_is_supported");
+
+        assert!(serde_json::from_value::<DynamicFeeConfig>(serialized).is_err());
     }
 }
