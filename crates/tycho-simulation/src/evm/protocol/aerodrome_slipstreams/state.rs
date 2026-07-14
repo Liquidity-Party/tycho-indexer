@@ -516,11 +516,27 @@ impl ProtocolSim for AerodromeSlipstreamsState {
         {
             self.default_fee = u32::from(default_fee.clone());
         }
-        self.dfc
-            .update_from_attributes(&delta.updated_attributes)
-            .map_err(|attribute| {
-                TransitionError::DecodeError(format!("Missing dynamic fee attribute: {attribute}"))
-            })?;
+        if let Some(dfc_base_fee) = delta
+            .updated_attributes
+            .get("dfc_baseFee")
+        {
+            self.dfc
+                .update_base_fee(u32::from(dfc_base_fee.clone()));
+        }
+        if let Some(dfc_fee_cap) = delta
+            .updated_attributes
+            .get("dfc_feeCap")
+        {
+            self.dfc
+                .update_fee_cap(u32::from(dfc_fee_cap.clone()));
+        }
+        if let Some(dfc_scaling_factor) = delta
+            .updated_attributes
+            .get("dfc_scalingFactor")
+        {
+            self.dfc
+                .update_scaling_factor(u64::from(dfc_scaling_factor.clone()));
+        }
         if let Some(tick) = delta.updated_attributes.get("tick") {
             // This is a hotfix because if the tick has never been updated after creation, it's
             // currently encoded as H256::zero(), therefore, we can't decode this as i32.
@@ -638,7 +654,6 @@ impl ProtocolSim for AerodromeSlipstreamsState {
 #[cfg(test)]
 mod tests {
     use alloy::primitives::{Sign, I256, U256};
-    use rstest::rstest;
     use tycho_common::simulation::errors::SimulationError;
 
     use super::*;
@@ -668,66 +683,9 @@ mod tests {
             0,
             ticks,
             vec![Observation::default()],
-            DynamicFeeConfig::new(3000, 10_000, 1, false, 0),
+            DynamicFeeConfig::new(3000, 10_000, 1),
         )
         .expect("Failed to create pool")
-    }
-
-    #[rstest]
-    #[case::latest_module(
-        hex_literal::hex!("090b2A6bb475c00e2256e2095A60887cD710803b"),
-        500
-    )]
-    #[case::stale_module(
-        hex_literal::hex!("DB45818A6db280ecfeB33cbeBd445423d0216b5D"),
-        3000
-    )]
-    fn dynamic_fee_updates_require_latest_module(
-        #[case] dynamic_fee_module: [u8; 20],
-        #[case] expected_fee: u32,
-    ) {
-        let mut pool = create_basic_test_pool();
-        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
-        let delta = ProtocolStateDelta {
-            component_id: "test-pool".to_string(),
-            updated_attributes: HashMap::from([
-                ("dynamic_fee_module".to_string(), Bytes::from(dynamic_fee_module)),
-                ("dfc_baseFee".to_string(), Bytes::from(500_u32.to_be_bytes())),
-                ("dfc_scalingFactor".to_string(), Bytes::from(0_u64.to_be_bytes())),
-                ("dfc_feeCap".to_string(), Bytes::from(700_u32.to_be_bytes())),
-                ("dfc_initialFeeEnabled".to_string(), Bytes::from([0_u8])),
-                ("dfc_initialFee".to_string(), Bytes::from(0_u32.to_be_bytes())),
-            ]),
-            ..Default::default()
-        };
-
-        pool.delta_transition(delta, &HashMap::new(), &Balances::default())
-            .expect("dynamic fee update should be valid");
-
-        assert_eq!(
-            pool.get_fee()
-                .expect("fee should be computable"),
-            expected_fee
-        );
-    }
-
-    #[test]
-    fn applies_partial_dynamic_fee_updates_after_module_initialization() {
-        let mut pool = create_basic_test_pool();
-        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
-        let delta = ProtocolStateDelta {
-            component_id: "test-pool".to_string(),
-            updated_attributes: HashMap::from([(
-                "dfc_baseFee".to_string(),
-                Bytes::from(500_u32.to_be_bytes()),
-            )]),
-            ..Default::default()
-        };
-
-        pool.delta_transition(delta, &HashMap::new(), &Balances::default())
-            .expect("partial dynamic fee update should be valid");
-
-        assert_eq!(pool.dfc, DynamicFeeConfig::new(500, 10_000, 1, false, 0));
     }
 
     #[test]
@@ -800,7 +758,7 @@ mod tests {
             tick,
             ticks,
             vec![Observation::default()],
-            DynamicFeeConfig::new(3000, 10_000, 1, false, 0),
+            DynamicFeeConfig::new(3000, 10_000, 1),
         )
         .expect("Failed to create pool");
 

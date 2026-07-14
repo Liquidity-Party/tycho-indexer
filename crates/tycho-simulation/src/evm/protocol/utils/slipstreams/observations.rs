@@ -113,15 +113,6 @@ impl Observations {
         Ok(())
     }
 
-    pub fn timestamp_at(&self, index: u16, cardinality: u16) -> Result<u32, SimulationError> {
-        let idx = index as usize;
-        if idx >= self.observations.len() {
-            return Err(self.observation_index_err(idx, index, cardinality));
-        }
-
-        Ok(self.observations[idx].block_timestamp)
-    }
-
     pub fn observe(
         &self,
         time: u32,
