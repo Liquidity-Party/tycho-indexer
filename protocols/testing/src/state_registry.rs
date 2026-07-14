@@ -1,17 +1,9 @@
 use tycho_simulation::{
     evm::{
-        engine_db::tycho_db::PreCachedDB,
-        protocol::{
-            ekubo::state::EkuboState, fluid::FluidV1, lunarbase::LunarBaseState,
-            pancakeswap_v2::state::PancakeswapV2State, rocketpool::state::RocketpoolState,
-            uniswap_v2::state::UniswapV2State, uniswap_v3::state::UniswapV3State,
-            uniswap_v4::state::UniswapV4State, vm::state::EVMPoolState,
-        },
-        stream::ProtocolStreamBuilder,
-    },
-    protocol::models::DecoderContext,
-    tycho_client::feed::component_tracker::ComponentFilter,
-    tycho_common::{dto::TvlThresholdTier, models::Chain},
+        engine_db::tycho_db::PreCachedDB, protocol::{
+            aerodrome_slipstreams::state::AerodromeSlipstreamsState, ekubo::state::EkuboState, fluid::FluidV1, lunarbase::LunarBaseState, pancakeswap_v2::state::PancakeswapV2State, rocketpool::state::RocketpoolState, uniswap_v2::state::UniswapV2State, uniswap_v3::state::UniswapV3State, uniswap_v4::state::UniswapV4State, vm::state::EVMPoolState,
+        }, stream::ProtocolStreamBuilder,
+    }, protocol::models::DecoderContext, tycho_client::feed::component_tracker::ComponentFilter, tycho_common::{dto::TvlThresholdTier, models::Chain},
 };
 
 /// Register decoder based on protocol system. Defaults to EVMPoolState.
@@ -71,6 +63,12 @@ pub fn register_protocol(
             decoder_context,
         ),
         "lunarbase" => stream_builder.exchange_with_decoder_context::<LunarBaseState>(
+            protocol_system,
+            tvl_filter,
+            None,
+            decoder_context,
+        ),
+        "aerodrome_slipstreams" => stream_builder.exchange_with_decoder_context::<AerodromeSlipstreamsState>(
             protocol_system,
             tvl_filter,
             None,
