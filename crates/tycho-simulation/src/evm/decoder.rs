@@ -1262,7 +1262,10 @@ mod tests {
     use mockall::predicate::*;
     use rstest::*;
     use tycho_client::feed::BlockHeader;
-    use tycho_common::{models::Chain, Bytes};
+    use tycho_common::{
+        models::{contract::AccountBalance, Chain},
+        Bytes,
+    };
 
     use super::*;
     use crate::evm::protocol::{curve::CurveState, uniswap_v2::state::UniswapV2State};
@@ -1451,6 +1454,76 @@ mod tests {
             .expect("decode failure");
 
         // The mock framework will assert that `delta_transition` was called exactly once
+    }
+
+    #[tokio::test]
+    async fn test_decode_updates_state_on_account_balance_change() {
+        let decoder = setup_decoder(true).await;
+        let mut mock_state = MockProtocolSim::new();
+        mock_state
+            .expect_clone_box()
+            .times(1)
+            .returning(|| {
+                let mut cloned_mock_state = MockProtocolSim::new();
+                cloned_mock_state
+                    .expect_delta_transition()
+                    .withf(|_, _, balances| !balances.account_balances.is_empty())
+                    .times(1)
+                    .returning(|_, _, _| Ok(()));
+                cloned_mock_state
+                    .expect_clone_box()
+                    .times(1)
+                    .returning(|| Box::new(MockProtocolSim::new()));
+                Box::new(cloned_mock_state)
+            });
+
+        let pool_id =
+            "0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2".to_string();
+        let tracked_account = Bytes::from("0xba12222222228d8ba445958a75a0704d566bf2c8").lpad(20, 0);
+        let mut state = decoder.state.write().await;
+        state
+            .states
+            .insert(pool_id.clone(), Box::new(mock_state) as Box<dyn ProtocolSim>);
+        state
+            .contracts_map
+            .insert(tracked_account.clone(), HashSet::from([pool_id.clone()]));
+        drop(state);
+
+        let mut msg = load_test_msg("balancer_v2_delta");
+        let deltas = msg
+            .state_msgs
+            .get_mut("vm:balancer_v2")
+            .and_then(|message| message.deltas.as_mut())
+            .expect("test fixture should contain Balancer deltas");
+        deltas.account_deltas.clear();
+        let component_balances = deltas
+            .component_balances
+            .remove(&pool_id)
+            .expect("test fixture should contain component balances");
+        let account_balances = component_balances
+            .into_iter()
+            .map(|(token, balance)| {
+                (
+                    token.clone(),
+                    AccountBalance::new(
+                        tracked_account.clone(),
+                        token,
+                        balance.balance,
+                        balance.modify_tx,
+                    ),
+                )
+            })
+            .collect();
+        deltas
+            .account_balances
+            .insert(tracked_account, account_balances);
+
+        let update = decoder
+            .decode(&msg)
+            .await
+            .expect("decode failure");
+
+        assert!(update.states.contains_key(&pool_id));
     }
 
     #[test]

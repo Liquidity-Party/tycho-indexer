@@ -1,10 +1,10 @@
-use substreams::store::{StoreNew, StoreSetIfNotExists, StoreSetIfNotExistsString};
+use substreams::store::{StoreNew, StoreSetIfNotExists, StoreSetIfNotExistsRaw};
 
 use crate::store_key::StoreKey;
 use tycho_substreams::prelude::*;
 
 #[substreams::handlers::store]
-pub fn store_few_wrappers(pools_created: BlockChanges, store: StoreSetIfNotExistsString) {
+pub fn store_few_wrappers(pools_created: BlockChanges, store: StoreSetIfNotExistsRaw) {
     for changes in pools_created.changes {
         for component in changes.component_changes {
             store_wrapper(&component, "underlying_token0", "fw_token0", &store);
@@ -17,14 +17,14 @@ fn store_wrapper(
     component: &ProtocolComponent,
     underlying_attribute: &str,
     wrapper_attribute: &str,
-    store: &StoreSetIfNotExistsString,
+    store: &StoreSetIfNotExistsRaw,
 ) {
     let underlying = static_attribute(component, underlying_attribute);
     let wrapper = static_attribute(component, wrapper_attribute);
     store.set_if_not_exists(
         0,
         StoreKey::FewWrapper.get_unique_key(&hex::encode(underlying)),
-        &hex::encode(wrapper),
+        &wrapper,
     );
 }
 

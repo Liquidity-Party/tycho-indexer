@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_non_optimizable_transfer_in_with_approval() {
+    fn test_single_transfer_from_with_approval() {
         let solution = make_solution(vec![make_swap("ring_swap_v2")]);
         let gas = estimate_gas_usage(&solution, Strategy::Single);
 

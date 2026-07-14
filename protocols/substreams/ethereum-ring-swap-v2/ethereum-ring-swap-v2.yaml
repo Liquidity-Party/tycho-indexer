@@ -38,7 +38,7 @@ modules:
     kind: store
     initialBlock: 20231667
     updatePolicy: set_if_not_exists
-    valueType: string
+    valueType: bytes
     inputs:
       - map: map_pools_created
 

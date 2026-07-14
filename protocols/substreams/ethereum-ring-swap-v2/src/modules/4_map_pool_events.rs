@@ -1,5 +1,6 @@
-use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
+
+use itertools::Itertools;
 use substreams::{
     key,
     pb::substreams::StoreDeltas,

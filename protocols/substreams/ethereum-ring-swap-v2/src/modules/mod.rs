@@ -9,11 +9,11 @@ mod map_pool_created;
 #[path = "2_store_pools.rs"]
 mod store_pools;
 
-#[path = "3_store_few_wrappers.rs"]
+#[path = "2_store_few_wrappers.rs"]
 mod store_few_wrappers;
 
-#[path = "4_map_wrapper_backing_deltas.rs"]
+#[path = "3_map_wrapper_backing_deltas.rs"]
 mod map_wrapper_backing_deltas;
 
-#[path = "3_map_pool_events.rs"]
+#[path = "4_map_pool_events.rs"]
 mod map_pool_events;

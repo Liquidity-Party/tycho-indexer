@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use substreams::{
     pb::substreams::StoreDeltas,
     prelude::BigInt,
-    store::{StoreAddBigInt, StoreGet, StoreGetString, StoreNew},
+    store::{StoreAddBigInt, StoreGet, StoreGetRaw, StoreNew},
 };
 use substreams_ethereum::{pb::eth::v2 as eth, Event};
 
@@ -19,34 +19,10 @@ use tycho_substreams::{abi::erc20, prelude::*};
 pub fn map_wrapper_backing_deltas(
     block: eth::Block,
     wrapper_store_deltas: StoreDeltas,
-    wrapper_store: StoreGetString,
+    wrapper_store: StoreGetRaw,
 ) -> Result<BlockBalanceDeltas, substreams::errors::Error> {
     let mut balance_deltas = Vec::new();
     let new_wrappers = newly_tracked_wrappers(wrapper_store_deltas)?;
-
-    if let Some(last_tx) = block
-        .transaction_traces
-        .last()
-        .map(Transaction::from)
-    {
-        for (underlying, wrapper) in &new_wrappers {
-            let balance = erc20::functions::BalanceOf { owner: wrapper.clone() }
-                .call(underlying.clone())
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Unable to snapshot underlying backing for FewToken wrapper {}",
-                        hex::encode(wrapper)
-                    )
-                })?;
-            balance_deltas.push(BalanceDelta {
-                ord: last_tx.index,
-                tx: Some(last_tx.clone()),
-                token: underlying.clone(),
-                delta: balance.to_signed_bytes_be(),
-                component_id: hex::encode(wrapper).into_bytes(),
-            });
-        }
-    }
 
     for raw_tx in block.transactions() {
         let transaction: Transaction = raw_tx.into();
@@ -60,10 +36,9 @@ pub fn map_wrapper_backing_deltas(
                 continue;
             }
 
-            let Some(wrapper_hex) = wrapper_store.get_last(&token_key) else {
+            let Some(wrapper) = wrapper_store.get_last(&token_key) else {
                 continue;
             };
-            let wrapper = hex::decode(wrapper_hex)?;
 
             let Some(transfer) = erc20::events::Transfer::match_and_decode(log) else {
                 continue;
@@ -90,7 +65,30 @@ pub fn map_wrapper_backing_deltas(
         }
     }
 
-    balance_deltas.sort_unstable_by_key(|delta| delta.ord);
+    if let Some(last_tx) = block
+        .transaction_traces
+        .last()
+        .map(Transaction::from)
+    {
+        for (underlying, wrapper) in &new_wrappers {
+            let balance = erc20::functions::BalanceOf { owner: wrapper.clone() }
+                .call(underlying.clone())
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Unable to snapshot underlying backing for FewToken wrapper {}",
+                        hex::encode(wrapper)
+                    )
+                })?;
+            balance_deltas.push(BalanceDelta {
+                ord: u64::MAX,
+                tx: Some(last_tx.clone()),
+                token: underlying.clone(),
+                delta: balance.to_signed_bytes_be(),
+                component_id: hex::encode(wrapper).into_bytes(),
+            });
+        }
+    }
+
     Ok(BlockBalanceDeltas { balance_deltas })
 }
 
@@ -106,7 +104,7 @@ fn newly_tracked_wrappers(
                 .key
                 .strip_prefix("FewWrapper:")
                 .ok_or_else(|| anyhow::anyhow!("Unexpected FewWrapper store key: {}", delta.key))?;
-            Ok((hex::decode(underlying_key)?, hex::decode(delta.new_value)?))
+            Ok((hex::decode(underlying_key)?, delta.new_value))
         })
         .collect()
 }

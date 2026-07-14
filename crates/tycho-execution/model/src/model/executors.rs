@@ -38,7 +38,6 @@ pub enum Executor {
     MaverickV2,
     Slipstreams,
     UniswapV2,
-    RingSwapV2,
     UniswapV3,
     NativeWrap,
     AerodromeV1,
@@ -64,14 +63,13 @@ pub struct CallbackTransferData {
 
 impl Executor {
     /// Array containing all [Executor]s.
-    pub const VARIANTS: [Executor; 12] = [
+    pub const VARIANTS: [Executor; 11] = [
         Executor::Curve,
         Executor::ERC4626,
         Executor::FluidV1,
         Executor::MaverickV2,
         Executor::Slipstreams,
         Executor::UniswapV2,
-        Executor::RingSwapV2,
         Executor::UniswapV3,
         Executor::NativeWrap,
         Executor::AerodromeV1,
@@ -233,40 +231,6 @@ impl Executor {
                 )?,
                 output_to_router: false,
             }),
-            Self::RingSwapV2 => {
-                let pool = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
-                    Address::SENDER_CONTROLLED,
-                )?;
-                let fw_token_in = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 60, end: 80 },
-                    Address::VARIANTS,
-                )?;
-                let fw_token_out = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 80, end: 100 },
-                    Address::VARIANTS,
-                )?;
-                if fw_token_in.is_sender_controlled() || fw_token_out.is_sender_controlled() {
-                    return Err(Error::revert("RingSwapV2.getTransferData: invalid FewToken"));
-                }
-                if pool.is_sender_controlled() {
-                    return Err(Error::revert("RingSwapV2.getTransferData: invalid pair"));
-                }
-
-                Ok(TransferData {
-                    transfer_type: TransferType::ProtocolWillDebit,
-                    receiver: fw_token_in,
-                    token_in: params.request(
-                        ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
-                        Address::POSSIBLY_ERC20_AND_NATIVE,
-                    )?,
-                    token_out: params.request(
-                        ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
-                        Address::POSSIBLY_ERC20_AND_NATIVE,
-                    )?,
-                    output_to_router: false,
-                })
-            }
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L81
             Self::UniswapV3 => Ok(TransferData {
                 transfer_type: TransferType::None,
@@ -544,35 +508,6 @@ impl Executor {
                     })
                 }
             }
-            Self::RingSwapV2 => {
-                let pool = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
-                    // trying more variants might find some very obscure bugs
-                    // in the future but slows down simulation a lot
-                    // and currently is ignored anyway
-                    Address::SENDER_CONTROLLED,
-                )?;
-                let fw_token_in = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 60, end: 80 },
-                    Address::VARIANTS,
-                )?;
-                let fw_token_out = params.request(
-                    ParamKey::ProtocolData { swap_index, start: 80, end: 100 },
-                    Address::VARIANTS,
-                )?;
-
-                if fw_token_in.is_sender_controlled() || fw_token_out.is_sender_controlled() {
-                    return Err(Error::revert("RingSwapV2.swap: invalid FewToken"));
-                }
-
-                if pool.is_sender_controlled() {
-                    return Err(Error::revert("RingSwapV2.swap: invalid pair"));
-                }
-
-                Err(Error::Ignore {
-                    reason: "ringswapv2 pool not sender controlled. not low hanging fruit. would require simulating real pool".into(),
-                })
-            }
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L37
             Self::UniswapV3 => {
                 let target = params.request(
@@ -713,7 +648,6 @@ impl Executor {
                 receiver: state.msg_sender(),
             }),
             Self::UniswapV2 => unimplemented!(),
-            Self::RingSwapV2 => unimplemented!(),
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L105
             Self::UniswapV3 => Ok(CallbackTransferData {
                 transfer_type: TransferType::Transfer,
@@ -744,7 +678,6 @@ impl Executor {
             // not worth modeling as it has no reverts or side effects
             Self::Slipstreams => Ok(()),
             Self::UniswapV2 => unimplemented!("UniswapV2 doesn't use callbacks"),
-            Self::RingSwapV2 => unimplemented!("RingSwapV2 doesn't use callbacks"),
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L58
             // not worth modeling as it has no reverts or side effects
             Self::UniswapV3 => Ok(()),
@@ -790,7 +723,6 @@ impl Executor {
                 // and currently is ignored anyway
                 Address::SENDER_CONTROLLED,
             )?,
-            Self::RingSwapV2 => Address::Router,
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/UniswapV3Executor.sol#L26
             Self::UniswapV3 => Address::Router,
             // https://github.com/propeller-heads/tycho-indexer/blob/d0a5db4ab55baf9ff87fb54cdfb59e015866b409/crates/tycho-execution/contracts/src/executors/NativeWrapExecutor.sol#L34

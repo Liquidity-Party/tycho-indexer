@@ -31,6 +31,7 @@ error RingSwapV2Executor__InvalidFewToken(address token, address fwToken);
 error RingSwapV2Executor__InvalidPair(
     address pair, address fwTokenIn, address fwTokenOut
 );
+error RingSwapV2Executor__InsufficientLiquidity();
 error RingSwapV2Executor__ZeroFewFactory();
 error RingSwapV2Executor__ZeroRingSwapFactory();
 
@@ -162,7 +163,9 @@ contract RingSwapV2Executor is IExecutor {
         uint112 reserveIn,
         uint112 reserveOut
     ) internal pure returns (uint256 amount) {
-        require(reserveIn > 0 && reserveOut > 0, "L");
+        if (reserveIn == 0 || reserveOut == 0) {
+            revert RingSwapV2Executor__InsufficientLiquidity();
+        }
         uint256 amountInWithFee = amountIn * (10000 - FEE_BPS);
         uint256 numerator = amountInWithFee * uint256(reserveOut);
         uint256 denominator = (uint256(reserveIn) * 10000) + amountInWithFee;

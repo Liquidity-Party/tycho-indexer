@@ -22,11 +22,13 @@ use crate::evm::protocol::{
         cpmm_fee, cpmm_get_amount_out, cpmm_get_limits, cpmm_spot_price, cpmm_swap_to_price,
         ProtocolFee,
     },
-    safe_math::{safe_add_u256, safe_sub_u256},
+    safe_math::{safe_add_u256, safe_div_u256, safe_mul_u256, safe_sub_u256},
     u256_num::{biguint_to_u256, u256_to_biguint},
     utils::add_fee_markup,
 };
 
+// A mainnet-fork gas report measures RingSwapV2Executor.swap at ~146k. The solution-level gas
+// estimator accounts for the ~60k input token transfer separately, leaving a 90k swap base.
 const SWAP_BASE_GAS: u64 = 90_000;
 const RING_SWAP_V2_FEE_BPS: u32 = 30;
 const FEE_PRECISION: U256 = U256::from_limbs([10_000, 0, 0, 0]);
@@ -78,52 +80,61 @@ impl RingSwapV2State {
         ProtocolFee::new(FEE_NUMERATOR, FEE_PRECISION)
     }
 
+    fn max_input_for_backing(
+        reserve_in: U256,
+        reserve_out: U256,
+        output_backing: U256,
+    ) -> Result<U256, SimulationError> {
+        let first_unexecutable_output = safe_add_u256(output_backing, U256::from(1))?;
+        if first_unexecutable_output >= reserve_out {
+            return Ok(U256::MAX);
+        }
+
+        // floor(amount_out) <= backing iff:
+        // amount_in * fee * (reserve_out - backing - 1)
+        //     < (backing + 1) * reserve_in * fee_precision.
+        let numerator =
+            safe_mul_u256(safe_mul_u256(first_unexecutable_output, reserve_in)?, FEE_PRECISION)?;
+        let denominator =
+            safe_mul_u256(FEE_NUMERATOR, safe_sub_u256(reserve_out, first_unexecutable_output)?)?;
+
+        safe_div_u256(safe_sub_u256(numerator, U256::from(1))?, denominator)
+    }
+
     fn capped_limits(
         &self,
         sell_token: Bytes,
         buy_token: Bytes,
     ) -> Result<(BigUint, BigUint), SimulationError> {
-        let (soft_input, soft_output) = cpmm_get_limits(
+        let (soft_input, _) = cpmm_get_limits(
             sell_token.clone(),
             buy_token.clone(),
             self.reserve0,
             self.reserve1,
             RING_SWAP_V2_FEE_BPS,
         )?;
-        let output_backing = if sell_token < buy_token { self.backing1 } else { self.backing0 };
-        if biguint_to_u256(&soft_output) <= output_backing {
-            return Ok((soft_input, soft_output));
-        }
-
-        let (reserve_in, reserve_out) = if sell_token < buy_token {
+        let zero_to_one = sell_token < buy_token;
+        let (reserve_in, reserve_out) = if zero_to_one {
             (self.reserve0, self.reserve1)
         } else {
             (self.reserve1, self.reserve0)
         };
-        let mut low = U256::ZERO;
-        let mut high = biguint_to_u256(&soft_input);
-        let two = U256::from(2);
-
-        while low < high {
-            let range = high - low;
-            let mut midpoint = low + range / two;
-            if range % two != U256::ZERO {
-                midpoint += U256::from(1);
-            }
-            let output =
-                cpmm_get_amount_out(midpoint, reserve_in, reserve_out, Self::protocol_fee())?;
-            if output <= output_backing {
-                low = midpoint;
-            } else {
-                high = midpoint - U256::from(1);
-            }
+        let soft_input_u256 = biguint_to_u256(&soft_input);
+        let soft_output =
+            cpmm_get_amount_out(soft_input_u256, reserve_in, reserve_out, Self::protocol_fee())?;
+        let output_backing = self.output_backing(zero_to_one);
+        if soft_output <= output_backing {
+            return Ok((soft_input, u256_to_biguint(soft_output)));
         }
 
-        if low == U256::ZERO {
+        let capped_input = Self::max_input_for_backing(reserve_in, reserve_out, output_backing)?
+            .min(soft_input_u256);
+        if capped_input == U256::ZERO {
             return Ok((BigUint::ZERO, BigUint::ZERO));
         }
-        let output = cpmm_get_amount_out(low, reserve_in, reserve_out, Self::protocol_fee())?;
-        Ok((u256_to_biguint(low), u256_to_biguint(output)))
+        let output =
+            cpmm_get_amount_out(capped_input, reserve_in, reserve_out, Self::protocol_fee())?;
+        Ok((u256_to_biguint(capped_input), u256_to_biguint(output)))
     }
 
     fn apply_backing_updates(&mut self, balances: &Balances) {
@@ -368,7 +379,8 @@ mod tests {
             .get_limits(address(1), address(2))
             .unwrap();
 
-        assert!(max_output <= BigUint::from(10_u64));
+        assert_eq!(max_input, BigUint::from(11_u64));
+        assert_eq!(max_output, BigUint::from(10_u64));
         assert!(state
             .get_amount_out(max_input.clone(), &token(1), &token(2))
             .is_ok());
@@ -376,6 +388,57 @@ mod tests {
             state.get_amount_out(max_input + BigUint::from(1_u64), &token(1), &token(2)),
             Err(SimulationError::InvalidInput(_, None))
         ));
+    }
+
+    #[test]
+    fn closed_form_backing_limit_is_exact_at_boundary() {
+        for (reserve_in, reserve_out, backing) in [
+            (1_000_u64, 1_000_u64, 0_u64),
+            (1_000, 1_000, 10),
+            (10_000, 25_000, 1_000),
+            (25_000, 10_000, 9_000),
+        ] {
+            let max_input = RingSwapV2State::max_input_for_backing(
+                U256::from(reserve_in),
+                U256::from(reserve_out),
+                U256::from(backing),
+            )
+            .unwrap();
+            let amount_out = cpmm_get_amount_out(
+                max_input,
+                U256::from(reserve_in),
+                U256::from(reserve_out),
+                RingSwapV2State::protocol_fee(),
+            )
+            .unwrap();
+            let next_amount_out = cpmm_get_amount_out(
+                max_input + U256::from(1),
+                U256::from(reserve_in),
+                U256::from(reserve_out),
+                RingSwapV2State::protocol_fee(),
+            )
+            .unwrap();
+
+            assert!(amount_out <= U256::from(backing));
+            assert!(next_amount_out > U256::from(backing));
+        }
+    }
+
+    #[test]
+    fn uncapped_limits_report_the_exact_cpmm_output() {
+        let state = state(10_000);
+        let (max_input, max_output) = state
+            .get_limits(address(1), address(2))
+            .unwrap();
+        let expected_output = cpmm_get_amount_out(
+            biguint_to_u256(&max_input),
+            state.reserve0,
+            state.reserve1,
+            RingSwapV2State::protocol_fee(),
+        )
+        .unwrap();
+
+        assert_eq!(max_output, u256_to_biguint(expected_output));
     }
 
     #[test]
