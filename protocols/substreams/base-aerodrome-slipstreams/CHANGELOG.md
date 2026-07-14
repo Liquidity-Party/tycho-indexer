@@ -46,6 +46,61 @@ For each configured module, the backfill should:
 4. Leave pools that have never been configured in the new module unchanged. Their missing or old
    module marker makes Tycho Simulation ignore stale attributes and use the default fee behavior.
 
+`protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py`
+implements this scan and reconstruction.
+
+Run it from the repository root with an archive-capable Base RPC:
+
+```bash
+BASE_RPC_URL=https://your-base-rpc.example \
+python3 protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py \
+  --to-block <CUTOVER_BLOCK_Y> \
+  > /tmp/slipstreams_dynamic_fee_scan.jsonl
+```
+
+The script uses the two fee modules configured by this package unless one or more `--module`
+arguments are supplied. It discovers each module's deployment block with historical
+`eth_getCode`, scans through the inclusive `--to-block`, and prints JSON Lines containing every
+decoded configuration event followed by the reconstructed final snapshot for each touched pool.
+If the RPC is not archive-capable, or the deployment block is already known, pass a safe inclusive
+start with `--from-block <DEPLOYMENT_OR_EARLIER_BLOCK>`.
+
+To reuse that JSONL output and skip the expensive `eth_getLogs` scan:
+
+```bash
+BASE_RPC_URL=https://your-base-rpc.example \
+python3 protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py \
+  --to-block <CUTOVER_BLOCK_Y> \
+  --input-file /tmp/slipstreams_dynamic_fee_scan.jsonl \
+  --sql-output /tmp/slipstreams_dynamic_fee_backfill.sql
+```
+
+`--input-file` reads the saved `type=event` rows and replays them into the final pool snapshots;
+the saved `type=pool_state` rows are ignored. Log scanning is completely skipped. An RPC is still
+required with `--sql-output`, but only to fetch block and transaction metadata for each pool's last
+configuration transaction.
+
+Alternatively, generate the database migration during the initial scan:
+
+```bash
+BASE_RPC_URL=https://your-base-rpc.example \
+python3 protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py \
+  --to-block <CUTOVER_BLOCK_Y> \
+  --sql-output /tmp/slipstreams_dynamic_fee_backfill.sql
+```
+
+The generated SQL is transactional and idempotent. It stages the reconstructed state, inserts a
+missing event block or transaction before resolving `modify_tx`, and resolves each
+`protocol_component_id` from the `base` chain, the `aerodrome_slipstreams` protocol system, and the
+pool address stored in `protocol_component.external_id`. It versions `dynamic_fee_module` and all
+five `dfc_*` attributes together by conditionally upserting their final snapshot into
+`protocol_state_default`. This is a current-state repair, not a historical replay: it does not
+create or modify archived `protocol_state` versions. If a newer streamed version already exists,
+that row is skipped. Contract-creation transactions have no recipient and are stored with an empty
+`to` byte array, matching the indexer's normal transaction insertion path. The SQL aborts if any
+staged row cannot be resolved, so its staged and resolved row counts should be reviewed before
+applying it.
+
 Use a non-overlapping cutover boundary: the backfill owns state through block `Y`, and the new SPKG
 stream owns updates after block `Y`. If indexing continues while the backfill runs, database writes
 must be conditional so the block-`Y` snapshot cannot overwrite newer streamed updates.
