@@ -23,6 +23,23 @@ tests:
         skip_simulation: false
         skip_execution: true
 
+  # InitialFeeSet enables a fee of 50 at block 44,228,502. At the selected stop
+  # block the pool has no observation from that block, so Factory.getSwapFee returns 50.
+  - name: test_initial_fee_enabled
+    start_block: 38996897
+    stop_block: 44228510
+    expected_components:
+      - id: "0xb30540172f1b37d1ee1d109e49f883e935e69219"
+        tokens:
+          - "0x311935cd80b76769bf2ecc9d8ab7635b2139cf82" # SOL
+          - "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" # USDC
+        static_attributes:
+          default_fee: "0x01f4"
+          tick_spacing: "0x0a"
+        creation_tx: "0x967196d2f84a5cb83dfdc0efa91b5e0b602b1f897f2ce81aff765b94a61724b9"
+        skip_simulation: false
+        skip_execution: true
+
   # These historical cases remain disabled because their wide ranges are too slow for routine
   # integration runs.
 
