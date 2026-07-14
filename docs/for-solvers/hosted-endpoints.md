@@ -14,6 +14,7 @@ description: Tycho Indexer's hosted endpoints
 <tr><td>Unichain Mainnet</td><td>tycho-unichain-beta.propellerheads.xyz</td></tr>
 <tr><td>Arbitrum Mainnet</td><td>tycho-arbitrum-beta.propellerheads.xyz</td></tr>
 <tr><td>Polygon Mainnet</td><td>tycho-polygon-beta.propellerheads.xyz</td></tr>
+<tr><td>BSC Mainnet</td><td>tycho-bsc-beta.propellerheads.xyz</td></tr>
 </tbody>
 </table>
 
