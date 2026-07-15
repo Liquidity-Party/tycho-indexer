@@ -20,7 +20,7 @@ tests: []
   #         default_fee: "0x0bb8"
   #         tick_spacing: "0x00c8"
   #       creation_tx: "0x798e0c9744073bcb80901d5ddb336bae0bcb8b93604f432607c90569bbb28ba9"
-  #       # Simulation support is released separately after the SPKG and backfill migration.
+  #       # Simulation support is released separately after the SPKG replay has caught up.
   #       skip_simulation: true
   #       skip_execution: true
 
@@ -38,7 +38,7 @@ tests: []
   #         default_fee: "0x01f4"
   #         tick_spacing: "0x0a"
   #       creation_tx: "0x967196d2f84a5cb83dfdc0efa91b5e0b602b1f897f2ce81aff765b94a61724b9"
-  #       # Simulation support is released separately after the SPKG and backfill migration.
+  #       # Simulation support is released separately after the SPKG replay has caught up.
   #       skip_simulation: true
   #       skip_execution: true
 

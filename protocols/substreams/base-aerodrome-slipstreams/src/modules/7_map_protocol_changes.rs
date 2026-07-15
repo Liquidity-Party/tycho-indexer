@@ -131,11 +131,11 @@ pub fn map_protocol_changes(
                     pool,
                 );
                 let attributes = if is_first_event {
-                    // The backfill gives every pool configured before the cutover a complete
-                    // current-module snapshot. If a previously untouched pool receives its first
-                    // event afterwards, its database row may still contain attributes from the
-                    // retired module. Emit all fields with the new module marker once so absent
-                    // current-module fields explicitly replace those stale values with zero.
+                    // During the database rollback and replay, a pool's first configured-module
+                    // event is its migration boundary. Emit every field with the new module marker
+                    // once so fields absent from the current module explicitly replace stale
+                    // retired-module values with zero. The same rule also initializes pools first
+                    // configured after the replay has caught up.
                     DYNAMIC_FEE_CONFIG_ATTRIBUTES
                         .into_iter()
                         .map(|attribute| Attribute {
