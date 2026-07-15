@@ -38,7 +38,7 @@ The backfill must restore each affected pool's complete configuration as of bloc
 only replay events between the Factory module switch at block `X` and the SPKG cutover. A module
 can be configured before it becomes active. For example,
 `0xF4Ecd78EBEB6d36CF7f80B5B6B41453515fe2785` first emitted a configuration update at block
-`44_227_070`, before the Factory selected it at block `44_228_401`.
+`44_221_840`, before the Factory selected it at block `44_228_401`.
 
 For each configured module, the backfill should:
 

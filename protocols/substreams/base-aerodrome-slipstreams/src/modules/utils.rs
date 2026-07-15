@@ -7,13 +7,8 @@ use substreams::scalar::BigInt;
 use substreams_ethereum::{pb::eth::v2 as eth, Event};
 use substreams_helper::hex::Hexable;
 
-pub const DYNAMIC_FEE_CONFIG_ATTRIBUTES: [&str; 5] = [
-    "dfc_baseFee",
-    "dfc_scalingFactor",
-    "dfc_feeCap",
-    "dfc_initialFeeEnabled",
-    "dfc_initialFee",
-];
+pub const DYNAMIC_FEE_CONFIG_ATTRIBUTES: [&str; 5] =
+    ["dfc_baseFee", "dfc_scalingFactor", "dfc_feeCap", "dfc_initialFeeEnabled", "dfc_initialFee"];
 
 // Earliest deployment among the configured fee modules:
 // - 0x090b2a6bb475c00e2256e2095a60887cd710803b at block 44_221_569

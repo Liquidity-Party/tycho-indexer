@@ -17,15 +17,11 @@ use substreams_ethereum::pb::eth::v2::{self as eth};
 use substreams_helper::hex::Hexable;
 use tycho_substreams::{balances::aggregate_balances_changes, prelude::*};
 
-fn is_first_dynamic_fee_config_event(
-    deltas: &StoreDeltas,
-    ordinal: u64,
-    pool: &[u8],
-) -> bool {
+fn is_first_dynamic_fee_config_event(deltas: &StoreDeltas, ordinal: u64, pool: &[u8]) -> bool {
     deltas.deltas.iter().any(|delta| {
-        delta.ordinal == ordinal
-            && delta.key == dynamic_fee_config_initialized_key(pool)
-            && delta.old_value.is_empty()
+        delta.ordinal == ordinal &&
+            delta.key == dynamic_fee_config_initialized_key(pool) &&
+            delta.old_value.is_empty()
     })
 }
 
@@ -112,8 +108,8 @@ pub fn map_protocol_changes(
                     });
                 }
             }
-            if should_process_dynamic_fee_config(block.number)
-                && dynamic_fee_modules.contains(&log.address)
+            if should_process_dynamic_fee_config(block.number) &&
+                dynamic_fee_modules.contains(&log.address)
             {
                 let Some(event) = DynamicFeeEvent::match_and_decode(log) else {
                     continue;
