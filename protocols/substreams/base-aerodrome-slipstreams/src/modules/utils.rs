@@ -15,6 +15,15 @@ pub const DYNAMIC_FEE_CONFIG_ATTRIBUTES: [&str; 5] = [
     "dfc_initialFee",
 ];
 
+// Earliest deployment among the configured fee modules:
+// - 0x090b2a6bb475c00e2256e2095a60887cd710803b at block 44_221_569
+// - 0xf4ecd78ebeb6d36cf7f80b5b6b41453515fe2785 at block 44_221_840
+const FIRST_DYNAMIC_FEE_MODULE_DEPLOYMENT_BLOCK: u64 = 44_221_569;
+
+pub fn should_process_dynamic_fee_config(block_number: u64) -> bool {
+    block_number >= FIRST_DYNAMIC_FEE_MODULE_DEPLOYMENT_BLOCK
+}
+
 pub fn dynamic_fee_config_key(pool: &[u8], attribute: &str) -> String {
     format!("{}:{attribute}", pool.to_hex())
 }
@@ -99,7 +108,16 @@ impl Params {
 
 #[cfg(test)]
 mod tests {
-    use super::{dynamic_fee_config_initialized_key, dynamic_fee_config_key};
+    use super::{
+        dynamic_fee_config_initialized_key, dynamic_fee_config_key,
+        should_process_dynamic_fee_config,
+    };
+
+    #[test]
+    fn starts_processing_at_the_first_configured_fee_module_deployment() {
+        assert!(!should_process_dynamic_fee_config(44_221_568));
+        assert!(should_process_dynamic_fee_config(44_221_569));
+    }
 
     #[test]
     fn dynamic_fee_config_keys_are_scoped_by_pool() {

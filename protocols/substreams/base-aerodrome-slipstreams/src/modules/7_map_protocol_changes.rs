@@ -1,8 +1,8 @@
 use crate::{
     events::get_log_changed_attributes,
     modules::utils::{
-        dynamic_fee_config_initialized_key, dynamic_fee_config_key, DynamicFeeEvent, Params,
-        DYNAMIC_FEE_CONFIG_ATTRIBUTES,
+        dynamic_fee_config_initialized_key, dynamic_fee_config_key,
+        should_process_dynamic_fee_config, DynamicFeeEvent, Params, DYNAMIC_FEE_CONFIG_ATTRIBUTES,
     },
     pb::tycho::evm::aerodrome::Pool,
 };
@@ -112,7 +112,9 @@ pub fn map_protocol_changes(
                     });
                 }
             }
-            if dynamic_fee_modules.contains(&log.address) {
+            if should_process_dynamic_fee_config(block.number)
+                && dynamic_fee_modules.contains(&log.address)
+            {
                 let Some(event) = DynamicFeeEvent::match_and_decode(log) else {
                     continue;
                 };
