@@ -1,3 +1,11 @@
+## [0.335.1](https://github.com/propeller-heads/tycho/compare/0.335.0...0.335.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **substreams:** match readme filename case for cargo publish ([37470fd](https://github.com/propeller-heads/tycho/commit/37470fd282eba913eba91da03fd96e32420748bd))
+* **substreams:** match readme filename case for cargo publish ([#1199](https://github.com/propeller-heads/tycho/issues/1199)) ([069d223](https://github.com/propeller-heads/tycho/commit/069d223d3c8139ae631953b6d926e607238eebeb))
+
 ## [0.335.0](https://github.com/propeller-heads/tycho/compare/0.334.0...0.335.0) (2026-07-15)
 
 
