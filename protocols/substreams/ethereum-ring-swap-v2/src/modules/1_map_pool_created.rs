@@ -74,10 +74,7 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
             component_changes: vec![ProtocolComponent {
                 id: event.pair.to_hex(),
                 tokens: tokens.component_tokens.clone(),
-                // The pair stores FewTokens, but solver-facing components use the underlying
-                // ERC-20s. Track both wrappers as related contracts so their backing balances
-                // trigger a Ring state refresh.
-                contracts: vec![tokens.fw_token0.clone(), tokens.fw_token1.clone()],
+                contracts: vec![],
                 static_att: static_attributes(&event, &tokens),
                 change: i32::from(ChangeType::Creation),
                 protocol_type: Some(ProtocolType {
@@ -87,18 +84,9 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
                     implementation_type: ImplementationType::Custom.into(),
                 }),
             }],
-            balance_changes: vec![
-                BalanceChange {
-                    token: tokens.component_tokens[0].clone(),
-                    balance: BigInt::from(0).to_signed_bytes_be(),
-                    component_id: event.pair.to_hex().as_bytes().to_vec(),
-                },
-                BalanceChange {
-                    token: tokens.component_tokens[1].clone(),
-                    balance: BigInt::from(0).to_signed_bytes_be(),
-                    component_id: event.pair.to_hex().as_bytes().to_vec(),
-                },
-            ],
+            // The component-backing pipeline seeds both underlying balances from the official
+            // FewToken wrappers at the end of this block.
+            balance_changes: vec![],
             entrypoints: vec![],
             entrypoint_params: vec![],
         })

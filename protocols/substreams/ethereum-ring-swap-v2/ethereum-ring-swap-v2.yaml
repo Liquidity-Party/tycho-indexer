@@ -42,6 +42,14 @@ modules:
     inputs:
       - map: map_pools_created
 
+  - name: store_token_pools
+    kind: store
+    initialBlock: 20231667
+    updatePolicy: append
+    valueType: string
+    inputs:
+      - map: map_pools_created
+
   - name: map_wrapper_backing_deltas
     kind: map
     initialBlock: 20231667
@@ -62,6 +70,27 @@ modules:
     inputs:
       - map: map_wrapper_backing_deltas
 
+  - name: map_component_backing_deltas
+    kind: map
+    initialBlock: 20231667
+    inputs:
+      - map: map_pools_created
+      - map: map_wrapper_backing_deltas
+      - store: store_wrapper_backings
+        mode: get
+      - store: store_token_pools
+        mode: get
+    output:
+      type: proto:tycho.evm.v1.BlockBalanceDeltas
+
+  - name: store_component_backings
+    kind: store
+    initialBlock: 20231667
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - map: map_component_backing_deltas
+
   - name: map_pool_events
     kind: map
     initialBlock: 20231667
@@ -69,8 +98,8 @@ modules:
       - source: sf.ethereum.type.v2.Block
       - map: map_pools_created
       - store: store_pools
-      - map: map_wrapper_backing_deltas
-      - store: store_wrapper_backings
+      - map: map_component_backing_deltas
+      - store: store_component_backings
         mode: deltas
     output:
       type: proto:tycho.evm.v1.BlockChanges

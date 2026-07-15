@@ -39,29 +39,26 @@ const FEE_NUMERATOR: U256 = U256::from_limbs([9_970, 0, 0, 0]);
 /// wrapper and caps executable output independently from the pair's FewToken reserves.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RingSwapV2State {
+    pub component_id: String,
     pub reserve0: U256,
     pub reserve1: U256,
     pub backing0: U256,
     pub backing1: U256,
     pub token0: Bytes,
     pub token1: Bytes,
-    pub fw_token0: Bytes,
-    pub fw_token1: Bytes,
 }
 
 impl RingSwapV2State {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        component_id: String,
         reserve0: U256,
         reserve1: U256,
         backing0: U256,
         backing1: U256,
         token0: Bytes,
         token1: Bytes,
-        fw_token0: Bytes,
-        fw_token1: Bytes,
     ) -> Self {
-        Self { reserve0, reserve1, backing0, backing1, token0, token1, fw_token0, fw_token1 }
+        Self { component_id, reserve0, reserve1, backing0, backing1, token0, token1 }
     }
 
     fn zero_to_one(&self, token_in: &Token, token_out: &Token) -> bool {
@@ -123,6 +120,9 @@ impl RingSwapV2State {
         let soft_output =
             cpmm_get_amount_out(soft_input_u256, reserve_in, reserve_out, Self::protocol_fee())?;
         let output_backing = self.output_backing(zero_to_one);
+        if output_backing == U256::ZERO {
+            return Ok((BigUint::ZERO, BigUint::ZERO));
+        }
         if soft_output <= output_backing {
             return Ok((soft_input, u256_to_biguint(soft_output)));
         }
@@ -138,19 +138,16 @@ impl RingSwapV2State {
     }
 
     fn apply_backing_updates(&mut self, balances: &Balances) {
-        if let Some(balance) = balances
-            .account_balances
-            .get(&self.fw_token0)
-            .and_then(|balances| balances.get(&self.token0))
+        if let Some(component_balances) = balances
+            .component_balances
+            .get(&self.component_id)
         {
-            self.backing0 = U256::from_be_slice(balance);
-        }
-        if let Some(balance) = balances
-            .account_balances
-            .get(&self.fw_token1)
-            .and_then(|balances| balances.get(&self.token1))
-        {
-            self.backing1 = U256::from_be_slice(balance);
+            if let Some(balance) = component_balances.get(&self.token0) {
+                self.backing0 = U256::from_be_slice(balance);
+            }
+            if let Some(balance) = component_balances.get(&self.token1) {
+                self.backing1 = U256::from_be_slice(balance);
+            }
         }
     }
 }
@@ -181,7 +178,8 @@ impl ProtocolSim for RingSwapV2State {
         };
         let amount_out =
             cpmm_get_amount_out(amount_in, reserve_in, reserve_out, Self::protocol_fee())?;
-        if amount_out > self.output_backing(zero_to_one) {
+        let output_backing = self.output_backing(zero_to_one);
+        if output_backing == U256::ZERO || amount_out > output_backing {
             return Err(SimulationError::InvalidInput(
                 "RingSwapV2 output exceeds FewToken underlying backing".to_string(),
                 None,
@@ -336,14 +334,13 @@ mod tests {
 
     fn state(backing1: u64) -> RingSwapV2State {
         RingSwapV2State::new(
+            "ring-pool".to_string(),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(backing1),
             address(1),
             address(2),
-            address(3),
-            address(4),
         )
     }
 
@@ -386,6 +383,21 @@ mod tests {
             .is_ok());
         assert!(matches!(
             state.get_amount_out(max_input + BigUint::from(1_u64), &token(1), &token(2)),
+            Err(SimulationError::InvalidInput(_, None))
+        ));
+    }
+
+    #[test]
+    fn zero_backing_has_no_executable_limits() {
+        let state = state(0);
+        let (max_input, max_output) = state
+            .get_limits(address(1), address(2))
+            .unwrap();
+
+        assert_eq!(max_input, BigUint::ZERO);
+        assert_eq!(max_output, BigUint::ZERO);
+        assert!(matches!(
+            state.get_amount_out(BigUint::from(1_u64), &token(1), &token(2)),
             Err(SimulationError::InvalidInput(_, None))
         ));
     }
@@ -442,14 +454,14 @@ mod tests {
     }
 
     #[test]
-    fn backing_only_delta_updates_without_reserve_attributes() {
+    fn component_backing_only_delta_updates_without_reserve_attributes() {
         let mut state = state(10);
         let balances = Balances {
-            component_balances: HashMap::new(),
-            account_balances: HashMap::from([(
-                address(4),
+            component_balances: HashMap::from([(
+                "ring-pool".to_string(),
                 HashMap::from([(address(2), Bytes::from(vec![42]))]),
             )]),
+            account_balances: HashMap::new(),
         };
 
         state
