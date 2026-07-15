@@ -20,7 +20,8 @@ tests:
           default_fee: "0x0bb8"
           tick_spacing: "0x00c8"
         creation_tx: "0x798e0c9744073bcb80901d5ddb336bae0bcb8b93604f432607c90569bbb28ba9"
-        skip_simulation: false
+        # Simulation support is released separately after the SPKG and backfill migration.
+        skip_simulation: true
         skip_execution: true
 
   # InitialFeeSet enables a fee of 50 at block 44,228,502. At the selected stop
@@ -37,7 +38,8 @@ tests:
           default_fee: "0x01f4"
           tick_spacing: "0x0a"
         creation_tx: "0x967196d2f84a5cb83dfdc0efa91b5e0b602b1f897f2ce81aff765b94a61724b9"
-        skip_simulation: false
+        # Simulation support is released separately after the SPKG and backfill migration.
+        skip_simulation: true
         skip_execution: true
 
   # These historical cases remain disabled because their wide ranges are too slow for routine

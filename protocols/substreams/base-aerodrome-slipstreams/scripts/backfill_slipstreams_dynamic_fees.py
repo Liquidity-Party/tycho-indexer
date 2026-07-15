@@ -9,6 +9,7 @@ Example:
     BASE_RPC_URL=https://... python3 \
         protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py \
         --to-block 44250000 \
+        --expected-cutover-hash 0x... \
         --sql-output /tmp/slipstreams_dynamic_fee_backfill.sql
 
 Reuse a previous JSONL scan without fetching logs again:
@@ -16,12 +17,15 @@ Reuse a previous JSONL scan without fetching logs again:
     BASE_RPC_URL=https://... python3 \
         protocols/substreams/base-aerodrome-slipstreams/scripts/backfill_slipstreams_dynamic_fees.py \
         --to-block 44250000 \
+        --expected-cutover-hash 0x... \
         --input-file /tmp/slipstreams_dynamic_fee_scan.jsonl \
         --sql-output /tmp/slipstreams_dynamic_fee_backfill.sql
 
 By default, each configured module is scanned from its deployment block. This
 requires an archive-capable RPC. ``--from-block`` can be used when the deployment
 block is already known or the RPC cannot serve historical ``eth_getCode`` calls.
+The JSONL starts with coverage metadata (chain, modules, scan range and cutover
+block hash); legacy files without this record are rejected.
 """
 
 from __future__ import annotations
@@ -43,9 +47,7 @@ DEFAULT_FEE_MODULES = (
 )
 DEFAULT_CHAIN = "base"
 DEFAULT_PROTOCOL_SYSTEM = "aerodrome_slipstreams"
-ABI_PATH = (
-    Path(__file__).resolve().parents[1] / "abi/DynamicSwapFeeModule.json"
-)
+ABI_PATH = Path(__file__).resolve().parents[1] / "abi/DynamicSwapFeeModule.json"
 MAX_TIMESTAMP_SQL = "TIMESTAMPTZ '262142-12-31 23:59:59.999999+00'"
 
 DYNAMIC_FEE_ATTRIBUTES = (
@@ -109,13 +111,24 @@ class TransactionMetadata:
     block: BlockMetadata
 
 
+@dataclass(frozen=True)
+class ScanMetadata:
+    chain: str
+    modules: tuple[str, ...]
+    from_blocks: dict[str, int]
+    to_block: int
+    to_block_hash: str
+
+
 def normalize_hex(value: Any, byte_length: int, label: str) -> str:
     if isinstance(value, str):
         raw = value[2:] if value.startswith("0x") else value
     else:
         raw = bytes(value).hex()
     if len(raw) != byte_length * 2:
-        raise ValueError(f"Invalid {label}: expected {byte_length} bytes, got {len(raw) // 2}")
+        raise ValueError(
+            f"Invalid {label}: expected {byte_length} bytes, got {len(raw) // 2}"
+        )
     try:
         bytes.fromhex(raw)
     except ValueError as exc:
@@ -229,7 +242,9 @@ def topic_to_bytes(topic: Any) -> bytes:
 
 def build_topic_map(event_abis: Mapping[str, Mapping[str, Any]]) -> dict[str, str]:
     return {
-        normalize_hash(Web3.keccak(text=event_signature(event_abi)), "event topic"): name
+        normalize_hash(
+            Web3.keccak(text=event_signature(event_abi)), "event topic"
+        ): name
         for name, event_abi in event_abis.items()
     }
 
@@ -247,7 +262,11 @@ def decode_log(log: Mapping[str, Any], topic_map: Mapping[str, str]) -> DynamicF
         raise ValueError(f"{name} has {len(topics)} topics; expected {expected_topics}")
 
     pool_topic = topic_to_bytes(topics[1])
-    value = int.from_bytes(topic_to_bytes(topics[2]), "big") if expected_topics == 3 else None
+    value = (
+        int.from_bytes(topic_to_bytes(topics[2]), "big")
+        if expected_topics == 3
+        else None
+    )
     return DynamicFeeEvent(
         module=normalize_address(log["address"], "fee module address"),
         pool=normalize_address(pool_topic[-20:], "pool address"),
@@ -343,7 +362,9 @@ def fetch_transaction_metadata(
             rpc_block = web3.eth.get_block(block_hash)
             block = BlockMetadata(
                 hash=block_hash,
-                parent_hash=normalize_hash(rpc_block["parentHash"], "parent block hash"),
+                parent_hash=normalize_hash(
+                    rpc_block["parentHash"], "parent block hash"
+                ),
                 number=as_int(rpc_block["number"]),
                 timestamp=as_int(rpc_block["timestamp"]),
             )
@@ -393,7 +414,9 @@ def render_sql(
         except KeyError as exc:
             raise ValueError(f"Missing metadata for transaction {tx_hash}") from exc
 
-        attributes = {"dynamic_fee_module": bytes.fromhex(state.module.removeprefix("0x"))}
+        attributes = {
+            "dynamic_fee_module": bytes.fromhex(state.module.removeprefix("0x"))
+        }
         attributes.update(
             (attribute, encode_positive_bigint(state.attributes[attribute]))
             for attribute in DYNAMIC_FEE_ATTRIBUTES
@@ -426,7 +449,9 @@ def render_sql(
             str(tx.index),
             bytea_sql(tx.block.hash),
         )
-        for tx in sorted(used_transactions.values(), key=lambda item: (item.block.number, item.index))
+        for tx in sorted(
+            used_transactions.values(), key=lambda item: (item.block.number, item.index)
+        )
     ]
 
     chain_literal = sql_literal(chain)
@@ -536,7 +561,9 @@ BEGIN
 END $$;
 
 -- This is a current-state repair, not a historical replay. Upsert only when the current row is
--- absent or is no newer than the reconstructed final snapshot.
+-- absent or still belongs to the old-SPKG side of the cutover. The reconstructed snapshot
+-- intentionally replaces stale retired-module rows even when their modify_tx is later than
+-- the current module's last configuration event.
 INSERT INTO protocol_state_default (
     protocol_component_id,
     attribute_name,
@@ -556,7 +583,7 @@ SELECT resolved.protocol_component_id,
            WHEN ROW(current_block."number", current_tx."index")
                   = ROW(resolved.block_number, resolved.tx_index)
                THEN current_state.previous_value
-           ELSE NULL
+           ELSE current_state.attribute_value
        END,
        resolved.modify_tx,
        resolved.valid_from,
@@ -568,15 +595,20 @@ LEFT JOIN protocol_state_default current_state
 LEFT JOIN "transaction" current_tx ON current_tx.id = current_state.modify_tx
 LEFT JOIN "block" current_block ON current_block.id = current_tx.block_id
 WHERE current_state.valid_from IS NULL
-   OR ROW(current_block."number", current_tx."index")
-      <= ROW(resolved.block_number, resolved.tx_index)
+   OR current_block."number" <= {to_block}
 ON CONFLICT ON CONSTRAINT protocol_state_default_unique_pk DO UPDATE
 SET attribute_value = EXCLUDED.attribute_value,
     previous_value = EXCLUDED.previous_value,
     modify_tx = EXCLUDED.modify_tx,
     valid_from = EXCLUDED.valid_from,
     modified_ts = CURRENT_TIMESTAMP
-WHERE protocol_state_default.valid_from <= EXCLUDED.valid_from;
+WHERE EXISTS (
+    SELECT 1
+    FROM "transaction" conflict_tx
+    JOIN "block" conflict_block ON conflict_block.id = conflict_tx.block_id
+    WHERE conflict_tx.id = protocol_state_default.modify_tx
+      AND conflict_block."number" <= {to_block}
+);
 
 SELECT count(*) AS backfilled_attribute_rows FROM _slipstreams_backfill_resolved;
 
@@ -584,7 +616,12 @@ COMMIT;
 """
 
 
-def print_results(events: Sequence[DynamicFeeEvent], states: Sequence[PoolState]) -> None:
+def print_results(
+    metadata: ScanMetadata,
+    events: Sequence[DynamicFeeEvent],
+    states: Sequence[PoolState],
+) -> None:
+    print(json.dumps({"type": "scan_metadata", **asdict(metadata)}, sort_keys=True))
     for event in events:
         print(json.dumps({"type": "event", **asdict(event)}, sort_keys=True))
     for state in states:
@@ -605,8 +642,9 @@ def print_results(events: Sequence[DynamicFeeEvent], states: Sequence[PoolState]
         )
 
 
-def load_events_from_output(path: Path) -> list[DynamicFeeEvent]:
-    """Load event rows from JSONL previously written by ``print_results``."""
+def load_scan_output(path: Path) -> tuple[ScanMetadata, list[DynamicFeeEvent]]:
+    """Load and validate metadata plus event rows written by ``print_results``."""
+    metadata: ScanMetadata | None = None
     events: list[DynamicFeeEvent] = []
     with path.open() as output_file:
         for line_number, line in enumerate(output_file, start=1):
@@ -615,9 +653,45 @@ def load_events_from_output(path: Path) -> list[DynamicFeeEvent]:
             try:
                 record = json.loads(line)
             except json.JSONDecodeError as exc:
-                raise ValueError(f"Invalid JSON in {path} at line {line_number}: {exc.msg}") from exc
+                raise ValueError(
+                    f"Invalid JSON in {path} at line {line_number}: {exc.msg}"
+                ) from exc
             if not isinstance(record, dict):
-                raise ValueError(f"Invalid JSONL record in {path} at line {line_number}")
+                raise ValueError(
+                    f"Invalid JSONL record in {path} at line {line_number}"
+                )
+            if record.get("type") == "scan_metadata":
+                if metadata is not None:
+                    raise ValueError(f"{path} contains multiple scan_metadata rows")
+                try:
+                    modules = tuple(
+                        normalize_address(module, "fee module address")
+                        for module in record["modules"]
+                    )
+                    from_blocks = {
+                        normalize_address(module, "fee module address"): as_int(
+                            from_block
+                        )
+                        for module, from_block in record["from_blocks"].items()
+                    }
+                    metadata = ScanMetadata(
+                        chain=str(record["chain"]),
+                        modules=modules,
+                        from_blocks=from_blocks,
+                        to_block=as_int(record["to_block"]),
+                        to_block_hash=normalize_hash(
+                            record["to_block_hash"], "cutover block hash"
+                        ),
+                    )
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"Invalid scan_metadata record in {path} at line {line_number}: {exc}"
+                    ) from exc
+                if set(metadata.from_blocks) != set(metadata.modules):
+                    raise ValueError(
+                        f"Invalid scan_metadata in {path}: from_blocks must cover every fee module"
+                    )
+                continue
             if record.get("type") != "event":
                 continue
             try:
@@ -627,7 +701,9 @@ def load_events_from_output(path: Path) -> list[DynamicFeeEvent]:
                 raw_value = record.get("value")
                 events.append(
                     DynamicFeeEvent(
-                        module=normalize_address(record["module"], "fee module address"),
+                        module=normalize_address(
+                            record["module"], "fee module address"
+                        ),
                         pool=normalize_address(record["pool"], "pool address"),
                         name=name,
                         value=None if raw_value is None else as_int(raw_value),
@@ -644,16 +720,111 @@ def load_events_from_output(path: Path) -> list[DynamicFeeEvent]:
                 raise ValueError(
                     f"Invalid event record in {path} at line {line_number}: {exc}"
                 ) from exc
+    if metadata is None:
+        raise ValueError(
+            f"{path} does not contain scan_metadata; rerun the scan to record its coverage"
+        )
     if not events:
         raise ValueError(f"{path} does not contain any event rows")
     events.sort(key=lambda item: item.ordinal)
-    return events
+    for event in events:
+        if event.module not in metadata.modules:
+            raise ValueError(
+                f"Event module {event.module} is not declared in {path} scan_metadata"
+            )
+        if event.block_number < metadata.from_blocks[event.module]:
+            raise ValueError(
+                f"Event at block {event.block_number} precedes the declared scan start for "
+                f"{event.module}"
+            )
+        if event.block_number > metadata.to_block:
+            raise ValueError(
+                f"Event at block {event.block_number} is after the declared scan end "
+                f"{metadata.to_block}"
+            )
+    return metadata, events
+
+
+def validate_scan_metadata(
+    metadata: ScanMetadata,
+    *,
+    chain: str,
+    modules: Sequence[str],
+    to_block: int,
+    from_block: int | None,
+    expected_cutover_hash: str,
+) -> None:
+    if metadata.chain != chain:
+        raise ValueError(
+            f"Scan chain {metadata.chain!r} does not match requested chain {chain!r}"
+        )
+    expected_modules = {
+        normalize_address(module, "fee module address") for module in modules
+    }
+    if set(metadata.modules) != expected_modules:
+        raise ValueError("Scan fee modules do not match the requested fee modules")
+    if metadata.to_block != to_block:
+        raise ValueError(
+            f"Scan ends at block {metadata.to_block}, but requested cutover is {to_block}"
+        )
+    expected_hash = normalize_hash(expected_cutover_hash, "expected cutover block hash")
+    if metadata.to_block_hash != expected_hash:
+        raise ValueError(
+            f"Saved scan cutover hash {metadata.to_block_hash} does not match the expected "
+            f"extractor cutover hash {expected_hash}"
+        )
+    if from_block is not None and set(metadata.from_blocks.values()) != {from_block}:
+        starts = sorted(set(metadata.from_blocks.values()))
+        raise ValueError(
+            f"Saved scan starts {starts}, but requested start is {from_block}"
+        )
+
+
+def cutover_block_hash(web3: Web3, block_number: int) -> str:
+    block = web3.eth.get_block(block_number)
+    return normalize_hash(block["hash"], "cutover block hash")
+
+
+def finalized_cutover_block_hash(web3: Web3, block_number: int) -> str:
+    finalized_block = web3.eth.get_block("finalized")
+    finalized_number = as_int(finalized_block["number"])
+    if block_number > finalized_number:
+        raise ValueError(
+            f"Requested cutover block {block_number} is after RPC finalized block "
+            f"{finalized_number}"
+        )
+    return cutover_block_hash(web3, block_number)
+
+
+def validate_scan_start_blocks(web3: Web3, metadata: ScanMetadata) -> None:
+    for module in metadata.modules:
+        deployment_block = discover_creation_block(web3, module, metadata.to_block)
+        scan_start = metadata.from_blocks[module]
+        if scan_start > deployment_block:
+            raise ValueError(
+                f"Saved scan for {module} starts at block {scan_start}, after deployment "
+                f"block {deployment_block}; repeat the explicit --from-block override if this "
+                "later start is known to be safe"
+            )
+
+
+def verify_cutover_block_hash(web3: Web3, metadata: ScanMetadata) -> None:
+    current_hash = finalized_cutover_block_hash(web3, metadata.to_block)
+    if current_hash != metadata.to_block_hash:
+        raise ValueError(
+            f"Cutover block {metadata.to_block} hash changed: scan recorded "
+            f"{metadata.to_block_hash}, RPC returned {current_hash}"
+        )
 
 
 def connect_web3(args: argparse.Namespace) -> Web3:
     if not args.rpc_url:
         raise ValueError("Provide --rpc-url, BASE_RPC_URL or RPC_URL")
-    web3 = Web3(Web3.HTTPProvider(args.rpc_url, request_kwargs={"timeout": args.request_timeout}))
+    web3 = Web3(
+        Web3.HTTPProvider(
+            args.rpc_url, request_kwargs={"timeout": args.request_timeout}
+        )
+    )
     if not web3.is_connected():
         raise ConnectionError("Could not connect to the Base RPC")
     return web3
@@ -666,7 +837,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=os.getenv("BASE_RPC_URL") or os.getenv("RPC_URL"),
         help="Base JSON-RPC URL (defaults to BASE_RPC_URL, then RPC_URL)",
     )
-    parser.add_argument("--to-block", required=True, type=int, help="Inclusive cutover block Y")
+    parser.add_argument(
+        "--to-block", required=True, type=int, help="Inclusive cutover block Y"
+    )
+    parser.add_argument(
+        "--expected-cutover-hash",
+        required=True,
+        help="Canonical block Y hash read from the stopped extractor's extraction_state",
+    )
     parser.add_argument(
         "--from-block",
         type=int,
@@ -685,7 +863,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Read prior JSONL output and skip the eth_getLogs scan",
     )
-    parser.add_argument("--sql-output", type=Path, help="Write an executable PostgreSQL script")
+    parser.add_argument(
+        "--sql-output", type=Path, help="Write an executable PostgreSQL script"
+    )
     parser.add_argument("--chain", default=DEFAULT_CHAIN)
     parser.add_argument("--protocol-system", default=DEFAULT_PROTOCOL_SYSTEM)
     return parser.parse_args(argv)
@@ -698,25 +878,39 @@ def run(args: argparse.Namespace) -> int:
         raise ValueError("--from-block cannot be greater than --to-block")
     if args.chunk_size <= 0:
         raise ValueError("--chunk-size must be positive")
-    if args.input_file and (args.from_block is not None or args.modules):
-        raise ValueError("--input-file cannot be combined with --from-block or --module")
-
+    modules = tuple(
+        normalize_address(module, "fee module address")
+        for module in (args.modules or DEFAULT_FEE_MODULES)
+    )
+    expected_cutover_hash = normalize_hash(
+        args.expected_cutover_hash, "expected cutover block hash"
+    )
     web3: Web3 | None = None
     if args.input_file:
-        events = load_events_from_output(args.input_file)
-        if events[-1].block_number > args.to_block:
-            raise ValueError(
-                f"{args.input_file} contains an event after --to-block {args.to_block}"
-            )
-        print(f"Loaded {len(events)} event rows from {args.input_file}; scan skipped", file=sys.stderr)
-    else:
-        modules = tuple(
-            normalize_address(module, "fee module address")
-            for module in (args.modules or DEFAULT_FEE_MODULES)
+        metadata, events = load_scan_output(args.input_file)
+        validate_scan_metadata(
+            metadata,
+            chain=args.chain,
+            modules=modules,
+            to_block=args.to_block,
+            from_block=args.from_block,
+            expected_cutover_hash=expected_cutover_hash,
         )
+        print(
+            f"Loaded {len(events)} event rows from {args.input_file}; scan skipped",
+            file=sys.stderr,
+        )
+    else:
         web3 = connect_web3(args)
+        to_block_hash = finalized_cutover_block_hash(web3, args.to_block)
+        if to_block_hash != expected_cutover_hash:
+            raise ValueError(
+                f"RPC cutover hash {to_block_hash} does not match the stopped extractor's "
+                f"cutover hash {expected_cutover_hash}"
+            )
         topic_map = build_topic_map(load_event_abis())
         events = []
+        from_blocks: dict[str, int] = {}
         for module in modules:
             if args.from_block is None:
                 try:
@@ -728,6 +922,7 @@ def run(args: argparse.Namespace) -> int:
                     ) from exc
             else:
                 from_block = args.from_block
+            from_blocks[module] = from_block
             print(
                 f"Scanning {module} from block {from_block} through {args.to_block}",
                 file=sys.stderr,
@@ -743,10 +938,17 @@ def run(args: argparse.Namespace) -> int:
                 )
             )
         events.sort(key=lambda item: item.ordinal)
+        metadata = ScanMetadata(
+            chain=args.chain,
+            modules=modules,
+            from_blocks=from_blocks,
+            to_block=args.to_block,
+            to_block_hash=to_block_hash,
+        )
 
     states = replay_events(events)
     if not args.input_file:
-        print_results(events, states)
+        print_results(metadata, events, states)
     print(
         f"Found {len(events)} relevant events affecting {len(states)} pools",
         file=sys.stderr,
@@ -755,6 +957,9 @@ def run(args: argparse.Namespace) -> int:
     if args.sql_output:
         if web3 is None:
             web3 = connect_web3(args)
+        if args.input_file and args.from_block is None:
+            validate_scan_start_blocks(web3, metadata)
+        verify_cutover_block_hash(web3, metadata)
         transactions = fetch_transaction_metadata(web3, states)
         sql = render_sql(
             states,

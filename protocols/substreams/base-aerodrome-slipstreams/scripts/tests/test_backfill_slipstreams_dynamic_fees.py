@@ -8,7 +8,9 @@ from pathlib import Path
 
 
 SCRIPT_PATH = Path(__file__).parents[1] / "backfill_slipstreams_dynamic_fees.py"
-SPEC = importlib.util.spec_from_file_location("slipstreams_dynamic_fee_backfill", SCRIPT_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "slipstreams_dynamic_fee_backfill", SCRIPT_PATH
+)
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
@@ -79,13 +81,28 @@ class DynamicFeeBackfillTest(unittest.TestCase):
     def test_topic_map_uses_rpc_prefixed_topic_format(self):
         topic_map = MODULE.build_topic_map(MODULE.load_event_abis())
 
-        self.assertTrue(all(topic.startswith("0x") and len(topic) == 66 for topic in topic_map))
+        self.assertTrue(
+            all(topic.startswith("0x") and len(topic) == 66 for topic in topic_map)
+        )
 
-    def test_load_events_from_previous_jsonl_output(self):
-        events = [self.event("FeeCapSet", 30_000), self.event("ScalingFactorSet", 5_000_000)]
+    def test_load_scan_output_requires_and_returns_coverage_metadata(self):
+        events = [
+            self.event("FeeCapSet", 30_000),
+            self.event("ScalingFactorSet", 5_000_000),
+        ]
+        metadata = MODULE.ScanMetadata(
+            chain="base",
+            modules=(events[0].module,),
+            from_blocks={events[0].module: 90},
+            to_block=100,
+            to_block_hash="0x" + "04" * 32,
+        )
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "scan.jsonl"
-            lines = [json.dumps({"type": "event", **asdict(event)}) for event in events]
+            lines = [json.dumps({"type": "scan_metadata", **asdict(metadata)})]
+            lines.extend(
+                json.dumps({"type": "event", **asdict(event)}) for event in events
+            )
             lines.append(
                 json.dumps(
                     {
@@ -100,19 +117,138 @@ class DynamicFeeBackfillTest(unittest.TestCase):
             )
             output.write_text("\n".join(lines) + "\n")
 
-            loaded = MODULE.load_events_from_output(output)
+            loaded_metadata, loaded_events = MODULE.load_scan_output(output)
 
-        self.assertEqual(loaded, events)
+        self.assertEqual(loaded_metadata, metadata)
+        self.assertEqual(loaded_events, events)
 
-    def test_load_events_rejects_output_without_event_rows(self):
+    def test_load_scan_output_rejects_legacy_output_without_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "scan.jsonl"
-            output.write_text('{"type":"pool_state"}\n')
+            output.write_text(
+                json.dumps({"type": "event", **asdict(self.event("FeeCapSet", 30_000))})
+                + "\n"
+            )
 
-            with self.assertRaisesRegex(ValueError, "does not contain any event rows"):
-                MODULE.load_events_from_output(output)
+            with self.assertRaisesRegex(ValueError, "scan_metadata"):
+                MODULE.load_scan_output(output)
 
-    def test_sql_resolves_relations_and_does_not_overwrite_newer_state(self):
+    def test_scan_metadata_must_match_requested_cutover_and_modules(self):
+        metadata = MODULE.ScanMetadata(
+            chain="base",
+            modules=("0x" + "11" * 20,),
+            from_blocks={"0x" + "11" * 20: 90},
+            to_block=99,
+            to_block_hash="0x" + "04" * 32,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "ends at block 99.*requested cutover is 100"
+        ):
+            MODULE.validate_scan_metadata(
+                metadata,
+                chain="base",
+                modules=("0x" + "11" * 20,),
+                to_block=100,
+                from_block=None,
+                expected_cutover_hash="0x" + "04" * 32,
+            )
+
+        with self.assertRaisesRegex(ValueError, "fee modules do not match"):
+            MODULE.validate_scan_metadata(
+                MODULE.ScanMetadata(
+                    chain="base",
+                    modules=("0x" + "22" * 20,),
+                    from_blocks={"0x" + "22" * 20: 90},
+                    to_block=100,
+                    to_block_hash="0x" + "04" * 32,
+                ),
+                chain="base",
+                modules=("0x" + "11" * 20,),
+                to_block=100,
+                from_block=None,
+                expected_cutover_hash="0x" + "04" * 32,
+            )
+
+        with self.assertRaisesRegex(
+            ValueError, "Saved scan starts.*requested start is 90"
+        ):
+            MODULE.validate_scan_metadata(
+                MODULE.ScanMetadata(
+                    chain="base",
+                    modules=("0x" + "11" * 20,),
+                    from_blocks={"0x" + "11" * 20: 95},
+                    to_block=100,
+                    to_block_hash="0x" + "04" * 32,
+                ),
+                chain="base",
+                modules=("0x" + "11" * 20,),
+                to_block=100,
+                from_block=90,
+                expected_cutover_hash="0x" + "04" * 32,
+            )
+
+        with self.assertRaisesRegex(ValueError, "cutover hash.*does not match"):
+            MODULE.validate_scan_metadata(
+                MODULE.ScanMetadata(
+                    chain="base",
+                    modules=("0x" + "11" * 20,),
+                    from_blocks={"0x" + "11" * 20: 90},
+                    to_block=100,
+                    to_block_hash="0x" + "04" * 32,
+                ),
+                chain="base",
+                modules=("0x" + "11" * 20,),
+                to_block=100,
+                from_block=90,
+                expected_cutover_hash="0x" + "05" * 32,
+            )
+
+    def test_cutover_must_not_be_after_rpc_finalized_block(self):
+        class FakeEth:
+            def get_block(self, block_identifier):
+                if block_identifier == "finalized":
+                    return {"number": 99}
+                return {"hash": "0x" + "04" * 32}
+
+        class FakeWeb3:
+            eth = FakeEth()
+
+        with self.assertRaisesRegex(
+            ValueError, "cutover block 100.*finalized block 99"
+        ):
+            MODULE.finalized_cutover_block_hash(FakeWeb3(), 100)
+
+        self.assertEqual(
+            MODULE.finalized_cutover_block_hash(FakeWeb3(), 99),
+            "0x" + "04" * 32,
+        )
+
+    def test_implicit_scan_start_cannot_be_after_module_deployment(self):
+        class FakeEth:
+            def get_code(self, _address, block_identifier):
+                return b"\x01" if block_identifier >= 5 else b""
+
+        class FakeWeb3:
+            eth = FakeEth()
+
+        module = "0x" + "11" * 20
+        metadata = MODULE.ScanMetadata(
+            chain="base",
+            modules=(module,),
+            from_blocks={module: 6},
+            to_block=10,
+            to_block_hash="0x" + "04" * 32,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "starts at block 6.*deployment block 5"
+        ):
+            MODULE.validate_scan_start_blocks(FakeWeb3(), metadata)
+
+    def test_sql_overwrites_stale_state_through_cutover_but_not_newer_streamed_state(
+        self,
+    ):
         event = self.event("FeeCapSet", 30_000)
         [state] = MODULE.replay_events([event])
         tx = MODULE.TransactionMetadata(
@@ -141,12 +277,11 @@ class DynamicFeeBackfillTest(unittest.TestCase):
         self.assertIn("JOIN protocol_system ps", sql)
         self.assertIn("JOIN protocol_component pc", sql)
         self.assertIn("protocol_state_default", sql)
-        self.assertIn(
-            'ROW(current_block."number", current_tx."index")\n'
-            "      <= ROW(resolved.block_number, resolved.tx_index)",
-            sql,
+        self.assertIn('current_block."number" <= 100', sql)
+        self.assertIn('conflict_block."number" <= 100', sql)
+        self.assertNotIn(
+            "protocol_state_default.valid_from <= EXCLUDED.valid_from", sql
         )
-        self.assertIn("WHERE protocol_state_default.valid_from <= EXCLUDED.valid_from", sql)
         self.assertIn("dynamic_fee_module", sql)
         self.assertIn("dfc_initialFeeEnabled", sql)
         self.assertIn("-- Backfill owns state through Base block 100", sql)
