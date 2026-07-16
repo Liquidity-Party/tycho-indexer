@@ -37,7 +37,7 @@ use tycho_simulation::{
         hashflow::{client::HashflowClient, state::HashflowState},
         liquorice::{client::LiquoriceClient, state::LiquoriceState},
     },
-    tycho_common::models::{Chain, TvlThresholdTier},
+    tycho_common::models::{chain_config::TvlThresholdTier, Chain},
     utils::load_all_tokens,
 };
 use tycho_test::{
@@ -46,6 +46,7 @@ use tycho_test::{
         models::{TychoExecutionInput, TychoExecutionResult},
         simulate_swap_transaction, tenderly,
     },
+    is_block_not_found,
     token_prices::{cap_amount_to_eth_value, load_token_prices},
     validation::{batch_validate_components, get_validator, Validator},
 };
@@ -84,6 +85,11 @@ struct Cli {
     #[arg(long, env = "RPC_URL")]
     rpc_url: String,
 
+    /// Connect to Tycho over plain HTTP/WS instead of TLS. Enable this when targeting a local
+    /// dev instance (e.g. http://127.0.0.1:4242).
+    #[arg(long, env = "TYCHO_NO_TLS", default_value_t = false)]
+    no_tls: bool,
+
     /// Disable on-chain protocols
     #[arg(long, default_value_t = false)]
     disable_onchain: bool,
@@ -91,6 +97,10 @@ struct Cli {
     /// Disable RFQ protocols
     #[arg(long, default_value_t = false)]
     disable_rfq: bool,
+
+    /// Run PAMM RFQ protocols.
+    #[arg(long, default_value_t = true)]
+    run_pamm_protocols: bool,
 
     /// Port for the Prometheus metrics server
     #[arg(long, default_value_t = 9898)]
@@ -304,7 +314,7 @@ async fn run(cli: Cli) -> miette::Result<()> {
     info!(%cli.tycho_url, "Loading tokens...");
     let all_tokens = load_all_tokens(
         &cli.tycho_url,
-        false,
+        cli.no_tls,
         Some(cli.tycho_api_key.as_str()),
         true,
         chain,
@@ -339,6 +349,7 @@ async fn run(cli: Cli) -> miette::Result<()> {
             cli.tvl_buffer_ratio,
             cli.protocols.clone(),
             cli.partial_blocks,
+            cli.no_tls,
         ) {
             protocol_handle = Some(
                 protocol_stream_processor
@@ -348,18 +359,19 @@ async fn run(cli: Cli) -> miette::Result<()> {
         }
     }
     if !cli.disable_rfq {
-        if let Ok(rfq_stream_processor) = RFQStreamProcessor::new(
+        let rfq_stream_processor = RFQStreamProcessor::new(
             chain,
             tvl_threshold,
             cli.max_simulations as usize,
             Duration::from_secs(cli.skip_messages_duration),
-        ) {
-            rfq_handle = Some(
-                rfq_stream_processor
-                    .run_stream(&all_tokens, rfq_tx)
-                    .await?,
-            );
-        }
+            cli.run_pamm_protocols,
+        )
+        .unwrap_or_else(|e| panic!("Failed to create RFQ stream processor: {e}"));
+        rfq_handle = Some(
+            rfq_stream_processor
+                .run_stream(&all_tokens, rfq_tx)
+                .await?,
+        );
     }
 
     let tycho_state = Arc::new(RwLock::new(TychoState::default()));
@@ -895,6 +907,17 @@ async fn process_update(
                     }
                 }
                 Err(e) => {
+                    if is_block_not_found(&e.to_string()) {
+                        // The RPC node still lags behind Tycho after the batch-validation retries
+                        // exhausted: the block genuinely isn't available yet. This is infra
+                        // latency, not a state mismatch, so skip it rather than polluting the
+                        // validation-failure metric.
+                        warn!(
+                            component_id = %component_id,
+                            "Skipping validation: RPC block not yet available after retries"
+                        );
+                        continue;
+                    }
                     error!(
                         component_id = %component_id,
                         error = %e,
@@ -1032,7 +1055,10 @@ async fn process_update(
         }
     }
     if n_reverts > 0 || n_failures > 0 {
-        warn!("For block {}, simulated {total_simulations} executions, {n_reverts} simulations reverted, {n_failures} executions setup failed", block.number())
+        warn!(
+            "For block {}, simulated {total_simulations} executions, {n_reverts} simulations reverted, {n_failures} executions setup failed",
+            block.number()
+        )
     }
 
     Ok(())
