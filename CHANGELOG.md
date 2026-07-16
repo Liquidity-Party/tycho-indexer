@@ -1,3 +1,10 @@
+## [0.337.0](https://github.com/propeller-heads/tycho/compare/0.336.1...0.337.0) (2026-07-16)
+
+
+### Features
+
+* add --no-tls flag to the price_printer example ([#1206](https://github.com/propeller-heads/tycho/issues/1206)) ([6db0d30](https://github.com/propeller-heads/tycho/commit/6db0d30fb0d88bab3c1dab2359ed8f7167d3d734))
+
 ## [0.336.1](https://github.com/propeller-heads/tycho/compare/0.336.0...0.336.1) (2026-07-16)
 
 
