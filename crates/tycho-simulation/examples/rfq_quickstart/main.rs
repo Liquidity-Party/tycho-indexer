@@ -33,7 +33,7 @@ use tycho_execution::encoding::{
         utils::biguint_to_u256,
     },
     models,
-    models::{EncodedSolution, Solution, Swap, UserTransferType},
+    models::{ClientFeeParams, EncodedSolution, Solution, Swap, UserTransferType},
 };
 use tycho_simulation::{
     protocol::models::{ProtocolComponent, Update},
@@ -836,12 +836,17 @@ fn encode_tycho_router_call(
         .map_err(|_| EncodingError::InvalidInput("Invalid permit".to_string()))?;
     let signature = sign_permit(chain_id, &p, signer)?;
 
+    // The router's singleSwapPermit2 expects a ClientFeeParams struct after `receiver`.
+    // This quickstart charges no client fee, so pass the zeroed default.
+    let client_fee_params = ClientFeeParams::default().into_abi_params();
+
     let method_calldata = (
         given_amount,
         given_token,
         checked_token,
         min_amount_out,
         receiver,
+        client_fee_params,
         permit,
         signature.as_bytes().to_vec(),
         encoded_solution.swaps().to_vec(),
