@@ -1,3 +1,10 @@
+## [0.338.1](https://github.com/propeller-heads/tycho/compare/0.338.0...0.338.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **tycho-client:** classify non-revert tip sibling as delayed ([dba0a87](https://github.com/propeller-heads/tycho/commit/dba0a87c73b0d49f3521893664b71baa469bfef9))
+
 ## [0.338.0](https://github.com/propeller-heads/tycho/compare/0.337.1...0.338.0) (2026-07-17)
 
 
