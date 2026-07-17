@@ -81,7 +81,6 @@ pub fn map_wrapper_backing_deltas(
         }
     }
 
-    balance_deltas.sort_unstable_by_key(|delta| delta.ord);
     Ok(BlockBalanceDeltas { balance_deltas })
 }
 
