@@ -1,3 +1,16 @@
+## [0.339.0](https://github.com/propeller-heads/tycho/compare/0.338.1...0.339.0) (2026-07-17)
+
+
+### Features
+
+* **rfq:** switch Bebop to Bearer-token auth ([2dedcd2](https://github.com/propeller-heads/tycho/commit/2dedcd2c861f29cbfbe48c32cd96a46ea02da056))
+* **rfq:** switch Bebop to Bearer-token auth ([#1214](https://github.com/propeller-heads/tycho/issues/1214)) ([b7e3e13](https://github.com/propeller-heads/tycho/commit/b7e3e13685c796dd439faf2baf38d77d9fd92d20))
+
+
+### Bug Fixes
+
+* **rfq:** add missing ClientFeeParams to quickstart router call ([2f72485](https://github.com/propeller-heads/tycho/commit/2f724856cd57ed05672c699e94f3293aff219178))
+
 ## [0.338.1](https://github.com/propeller-heads/tycho/compare/0.338.0...0.338.1) (2026-07-17)
 
 
