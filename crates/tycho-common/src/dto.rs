@@ -626,6 +626,10 @@ impl AccountUpdate {
         Self { address, chain, slots, balance, code, change }
     }
 
+    /// Merges a newer update for the same account into this one.
+    ///
+    /// Fields absent in `other` keep their current values, matching
+    /// [`models::contract::AccountDelta::merge`].
     pub fn merge(&mut self, other: &Self) {
         self.slots.extend(
             other
@@ -633,8 +637,12 @@ impl AccountUpdate {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone())),
         );
-        self.balance.clone_from(&other.balance);
-        self.code.clone_from(&other.code);
+        if other.balance.is_some() {
+            self.balance.clone_from(&other.balance);
+        }
+        if other.code.is_some() {
+            self.code.clone_from(&other.code);
+        }
         self.change = self.change.merge(&other.change);
     }
 }
@@ -3012,6 +3020,41 @@ mod test {
 
         // Assert the new account1 equals to the expected state
         assert_eq!(account1, expected);
+    }
+
+    #[test]
+    fn test_account_update_merge_keeps_code_and_balance_when_other_carries_none() {
+        let mut creation = AccountUpdate::new(
+            Bytes::from(b"0x1234"),
+            Chain::Ethereum,
+            HashMap::from([(Bytes::from("0xaabb"), Bytes::from("0xccdd"))]),
+            Some(Bytes::from("0x1000")),
+            Some(Bytes::from("0xdeadbeaf")),
+            ChangeType::Creation,
+        );
+
+        // Storage-only delta for the same account, as produced during catch-up reduce(merge).
+        let storage_only_update = AccountUpdate::new(
+            Bytes::from(b"0x1234"),
+            Chain::Ethereum,
+            HashMap::from([(Bytes::from("0xeeff"), Bytes::from("0x11223344"))]),
+            None,
+            None,
+            ChangeType::Update,
+        );
+
+        creation.merge(&storage_only_update);
+
+        assert_eq!(creation.change, ChangeType::Creation);
+        assert_eq!(creation.code, Some(Bytes::from("0xdeadbeaf")));
+        assert_eq!(creation.balance, Some(Bytes::from("0x1000")));
+        assert_eq!(
+            creation.slots,
+            HashMap::from([
+                (Bytes::from("0xaabb"), Bytes::from("0xccdd")),
+                (Bytes::from("0xeeff"), Bytes::from("0x11223344")),
+            ])
+        );
     }
 
     #[test]
