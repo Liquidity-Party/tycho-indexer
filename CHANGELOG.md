@@ -1,3 +1,11 @@
+## [0.337.1](https://github.com/propeller-heads/tycho/compare/0.337.0...0.337.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **simulation:** overwrite existing accounts on snapshot re-apply ([c0724e6](https://github.com/propeller-heads/tycho/commit/c0724e6c6e4eea9cac1695d44de45b9a1f8214da))
+* **simulation:** overwrite existing accounts on snapshot re-apply ([#1215](https://github.com/propeller-heads/tycho/issues/1215)) ([460cb9a](https://github.com/propeller-heads/tycho/commit/460cb9adb0a4c849508e26cf952f5a9e31f5f649))
+
 ## [0.337.0](https://github.com/propeller-heads/tycho/compare/0.336.1...0.337.0) (2026-07-16)
 
 
