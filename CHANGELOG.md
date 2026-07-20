@@ -1,3 +1,13 @@
+## [0.340.0](https://github.com/propeller-heads/tycho/compare/0.339.1...0.340.0) (2026-07-20)
+
+
+### Features
+
+* add Plasma as a first-class chain ([99596e3](https://github.com/propeller-heads/tycho/commit/99596e3c24081731bbbcaf6963fc27f71439d147))
+* add Plasma chain support ([#1202](https://github.com/propeller-heads/tycho/issues/1202)) ([7126b7e](https://github.com/propeller-heads/tycho/commit/7126b7e6650147e717f1ec4ad522fc42cfe5fff4))
+* **execution:** add plasma deploy config and read fee setter from roles ([1c3e8cb](https://github.com/propeller-heads/tycho/commit/1c3e8cb97dba1ab20cb7b0b067e409f265cc3acf))
+* **execution:** register plasma contract addresses ([bd9fe33](https://github.com/propeller-heads/tycho/commit/bd9fe33ae9625023db3162546ce3d58ae3386358))
+
 ## [0.339.1](https://github.com/propeller-heads/tycho/compare/0.339.0...0.339.1) (2026-07-20)
 
 
