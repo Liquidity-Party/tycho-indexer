@@ -518,8 +518,10 @@ impl ProtocolSim for AerodromeSlipstreamsState {
         }
         self.dfc
             .update_from_attributes(&delta.updated_attributes)
-            .map_err(|attribute| {
-                TransitionError::DecodeError(format!("Missing dynamic fee attribute: {attribute}"))
+            .map_err(|err| {
+                TransitionError::DecodeError(format!(
+                    "Failed to update dynamic fee module config: {err}"
+                ))
             })?;
         if let Some(tick) = delta.updated_attributes.get("tick") {
             // This is a hotfix because if the tick has never been updated after creation, it's
@@ -638,7 +640,6 @@ impl ProtocolSim for AerodromeSlipstreamsState {
 #[cfg(test)]
 mod tests {
     use alloy::primitives::{Sign, I256, U256};
-    use rstest::rstest;
     use tycho_common::simulation::errors::SimulationError;
 
     use super::*;
@@ -673,22 +674,8 @@ mod tests {
         .expect("Failed to create pool")
     }
 
-    #[rstest]
-    #[case::latest_module(
-        hex_literal::hex!("090b2A6bb475c00e2256e2095A60887cD710803b"),
-        500
-    )]
-    #[case::stale_module(
-        hex_literal::hex!("DB45818A6db280ecfeB33cbeBd445423d0216b5D"),
-        3000
-    )]
-    fn dynamic_fee_updates_require_latest_module(
-        #[case] dynamic_fee_module: [u8; 20],
-        #[case] expected_fee: u32,
-    ) {
-        let mut pool = create_basic_test_pool();
-        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
-        let delta = ProtocolStateDelta {
+    fn dynamic_fee_delta(dynamic_fee_module: [u8; 20]) -> ProtocolStateDelta {
+        ProtocolStateDelta {
             component_id: "test-pool".to_string(),
             updated_attributes: HashMap::from([
                 ("dynamic_fee_module".to_string(), Bytes::from(dynamic_fee_module)),
@@ -699,7 +686,15 @@ mod tests {
                 ("dfc_initialFee".to_string(), Bytes::from(0_u32.to_be_bytes())),
             ]),
             ..Default::default()
-        };
+        }
+    }
+
+    #[test]
+    fn dynamic_fee_update_applies_for_supported_module() {
+        let mut pool = create_basic_test_pool();
+        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
+        let delta =
+            dynamic_fee_delta(hex_literal::hex!("090b2A6bb475c00e2256e2095A60887cD710803b"));
 
         pool.delta_transition(delta, &HashMap::new(), &Balances::default())
             .expect("dynamic fee update should be valid");
@@ -707,7 +702,22 @@ mod tests {
         assert_eq!(
             pool.get_fee()
                 .expect("fee should be computable"),
-            expected_fee
+            500
+        );
+    }
+
+    #[test]
+    fn dynamic_fee_update_rejects_unsupported_module() {
+        let mut pool = create_basic_test_pool();
+        pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
+        let delta =
+            dynamic_fee_delta(hex_literal::hex!("DB45818A6db280ecfeB33cbeBd445423d0216b5D"));
+
+        let result = pool.delta_transition(delta, &HashMap::new(), &Balances::default());
+
+        assert!(
+            matches!(result, Err(TransitionError::DecodeError(_))),
+            "unsupported module deltas should be rejected, got {result:?}"
         );
     }
 

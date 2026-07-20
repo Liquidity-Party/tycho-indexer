@@ -19,14 +19,13 @@ const SUPPORTED_DYNAMIC_FEE_MODULES: [Address; 2] = [
 ];
 const DYNAMIC_FEE_MODULE_ATTRIBUTE: &str = "dynamic_fee_module";
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicFeeConfig {
     base_fee: u32,
     fee_cap: u32,
     scaling_factor: u64,
     initial_fee_enabled: bool,
     initial_fee: u32,
-    module_is_supported: bool,
 }
 
 fn is_supported_dynamic_fee_module(fee_module: &[u8]) -> bool {
@@ -43,15 +42,14 @@ impl DynamicFeeConfig {
         initial_fee_enabled: bool,
         initial_fee: u32,
     ) -> Self {
-        Self {
-            base_fee,
-            fee_cap,
-            scaling_factor,
-            initial_fee_enabled,
-            initial_fee,
-            module_is_supported: true,
-        }
+        Self { base_fee, fee_cap, scaling_factor, initial_fee_enabled, initial_fee }
     }
+
+    /// Builds a config from a full snapshot's attributes.
+    ///
+    /// Errors when the `dynamic_fee_module` marker is absent or is not one of the supported
+    /// replacement deployments, so the caller can skip the pool rather than trust stale fee
+    /// attributes left by a retired module. The error message is complete and ready to wrap.
     pub(crate) fn from_attributes(
         attributes: &HashMap<String, Bytes>,
     ) -> Result<Self, &'static str> {
@@ -59,26 +57,26 @@ impl DynamicFeeConfig {
             .get(DYNAMIC_FEE_MODULE_ATTRIBUTE)
             .is_some_and(|module| is_supported_dynamic_fee_module(module))
         {
-            return Ok(Self::default());
+            return Err("dynamic fee module is missing or not one of the supported deployments");
         }
 
         Ok(Self {
             base_fee: u32::from(
                 attributes
                     .get("dfc_baseFee")
-                    .ok_or("dfc_baseFee")?
+                    .ok_or("missing dynamic fee attribute `dfc_baseFee`")?
                     .clone(),
             ),
             fee_cap: u32::from(
                 attributes
                     .get("dfc_feeCap")
-                    .ok_or("dfc_feeCap")?
+                    .ok_or("missing dynamic fee attribute `dfc_feeCap`")?
                     .clone(),
             ),
             scaling_factor: u64::from(
                 attributes
                     .get("dfc_scalingFactor")
-                    .ok_or("dfc_scalingFactor")?
+                    .ok_or("missing dynamic fee attribute `dfc_scalingFactor`")?
                     .clone(),
             ),
             initial_fee_enabled: attributes
@@ -89,19 +87,20 @@ impl DynamicFeeConfig {
                 .cloned()
                 .map(u32::from)
                 .unwrap_or_default(),
-            module_is_supported: true,
         })
     }
 
+    /// Applies a delta's attribute updates.
+    ///
+    /// A delta carrying the `dynamic_fee_module` marker fully re-initializes the config (and errors
+    /// on an unsupported module); markerless deltas apply only the dynamic-fee fields they contain,
+    /// leaving the rest untouched.
     pub(crate) fn update_from_attributes(
         &mut self,
         attributes: &HashMap<String, Bytes>,
     ) -> Result<(), &'static str> {
         if attributes.contains_key(DYNAMIC_FEE_MODULE_ATTRIBUTE) {
             *self = Self::from_attributes(attributes)?;
-            return Ok(());
-        }
-        if !self.module_is_supported {
             return Ok(());
         }
 
@@ -320,34 +319,19 @@ mod tests {
         assert_eq!(config, DynamicFeeConfig::new(200, 1_000, 5_000_000, true, 50));
     }
 
-    #[test]
-    fn ignores_partial_updates_until_a_supported_module_initializes_the_config() {
-        let mut config = DynamicFeeConfig::from_attributes(&HashMap::from([(
-            DYNAMIC_FEE_MODULE_ATTRIBUTE.to_string(),
-            Bytes::from([0x11; 20]),
-        )]))
-        .expect("unsupported module should fall back to defaults");
+    #[rstest]
+    #[case::missing_module(None)]
+    #[case::unsupported_module(Some(Bytes::from([0x11; 20])))]
+    fn from_attributes_rejects_unsupported_modules(#[case] module: Option<Bytes>) {
+        let mut attributes = HashMap::from([
+            ("dfc_baseFee".to_string(), Bytes::from(200_u32.to_be_bytes())),
+            ("dfc_feeCap".to_string(), Bytes::from(1_000_u32.to_be_bytes())),
+            ("dfc_scalingFactor".to_string(), Bytes::from(5_000_000_u64.to_be_bytes())),
+        ]);
+        if let Some(module) = module {
+            attributes.insert(DYNAMIC_FEE_MODULE_ATTRIBUTE.to_string(), module);
+        }
 
-        config
-            .update_from_attributes(&HashMap::from([(
-                "dfc_baseFee".to_string(),
-                Bytes::from(200_u32.to_be_bytes()),
-            )]))
-            .expect("ignored partial update should remain valid");
-
-        assert_eq!(config, DynamicFeeConfig::default());
-    }
-
-    #[test]
-    fn serialized_config_requires_explicit_module_support_state() {
-        let config = DynamicFeeConfig::new(100, 1_000, 5_000_000, false, 0);
-        let mut serialized = serde_json::to_value(config).expect("config should serialize");
-
-        serialized
-            .as_object_mut()
-            .expect("serialized config should be an object")
-            .remove("module_is_supported");
-
-        assert!(serde_json::from_value::<DynamicFeeConfig>(serialized).is_err());
+        assert!(DynamicFeeConfig::from_attributes(&attributes).is_err());
     }
 }

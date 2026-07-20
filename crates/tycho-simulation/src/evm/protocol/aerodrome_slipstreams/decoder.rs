@@ -85,7 +85,7 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for AerodromeSlipstreamsS
         );
 
         let dynamic_fee_config = DynamicFeeConfig::from_attributes(&snapshot.state.attributes)
-            .map_err(|attribute| InvalidSnapshotError::MissingAttribute(attribute.to_string()))?;
+            .map_err(|err| InvalidSnapshotError::ValueError(err.to_string()))?;
 
         let tick_spacing = snapshot
             .component
@@ -296,16 +296,18 @@ mod tests {
     #[case::missing_module(None)]
     #[case::stale_module(Some(Bytes::from(STALE_DYNAMIC_FEE_MODULE)))]
     #[tokio::test]
-    async fn stale_dynamic_fee_config_falls_back_to_module_defaults(
+    async fn unsupported_dynamic_fee_module_fails_to_decode(
         #[case] dynamic_fee_module: Option<Bytes>,
     ) {
         let decoded = try_decode_snapshot_with_defaults::<AerodromeSlipstreamsState>(snapshot(
             dynamic_fee_module,
         ))
-        .await
-        .expect("stale snapshots should remain decodable");
+        .await;
 
-        assert_eq!(decoded, expected_state(DynamicFeeConfig::default()));
+        assert!(
+            matches!(decoded, Err(InvalidSnapshotError::ValueError(_))),
+            "unsupported modules should be skipped, got {decoded:?}"
+        );
     }
 
     #[rstest]
