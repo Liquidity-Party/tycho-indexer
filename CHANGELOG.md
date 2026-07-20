@@ -1,3 +1,45 @@
+## [0.339.0](https://github.com/propeller-heads/tycho/compare/0.338.1...0.339.0) (2026-07-17)
+
+
+### Features
+
+* **rfq:** switch Bebop to Bearer-token auth ([2dedcd2](https://github.com/propeller-heads/tycho/commit/2dedcd2c861f29cbfbe48c32cd96a46ea02da056))
+* **rfq:** switch Bebop to Bearer-token auth ([#1214](https://github.com/propeller-heads/tycho/issues/1214)) ([b7e3e13](https://github.com/propeller-heads/tycho/commit/b7e3e13685c796dd439faf2baf38d77d9fd92d20))
+
+
+### Bug Fixes
+
+* **rfq:** add missing ClientFeeParams to quickstart router call ([2f72485](https://github.com/propeller-heads/tycho/commit/2f724856cd57ed05672c699e94f3293aff219178))
+
+## [0.338.1](https://github.com/propeller-heads/tycho/compare/0.338.0...0.338.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **tycho-client:** classify non-revert tip sibling as delayed ([dba0a87](https://github.com/propeller-heads/tycho/commit/dba0a87c73b0d49f3521893664b71baa469bfef9))
+
+## [0.338.0](https://github.com/propeller-heads/tycho/compare/0.337.1...0.338.0) (2026-07-17)
+
+
+### Features
+
+* add Ramses V3 (Polygon) indexing, simulation, and execution ([#1208](https://github.com/propeller-heads/tycho/issues/1208)) ([089920b](https://github.com/propeller-heads/tycho/commit/089920bc53e9f2ed36b2b9ac73126dbf7a6794b3))
+
+
+### Bug Fixes
+
+* **testing:** key executors by test chain, not hardcoded ethereum ([a30fee7](https://github.com/propeller-heads/tycho/commit/a30fee74d98042f6349f38cee9aad541dcbede78))
+* **testing:** key executors by test chain, not hardcoded ethereum ([#1210](https://github.com/propeller-heads/tycho/issues/1210)) ([b41f592](https://github.com/propeller-heads/tycho/commit/b41f592cc38282857b0db49c99d070f9c7431963))
+* **token-analysis:** honor min_balance in TokenOwnerStore::find_owner ([#1209](https://github.com/propeller-heads/tycho/issues/1209)) ([f79c935](https://github.com/propeller-heads/tycho/commit/f79c9355429987e94230ce4429cfe7dd663f94c1))
+
+## [0.337.1](https://github.com/propeller-heads/tycho/compare/0.337.0...0.337.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **simulation:** overwrite existing accounts on snapshot re-apply ([c0724e6](https://github.com/propeller-heads/tycho/commit/c0724e6c6e4eea9cac1695d44de45b9a1f8214da))
+* **simulation:** overwrite existing accounts on snapshot re-apply ([#1215](https://github.com/propeller-heads/tycho/issues/1215)) ([460cb9a](https://github.com/propeller-heads/tycho/commit/460cb9adb0a4c849508e26cf952f5a9e31f5f649))
+
 ## [0.337.0](https://github.com/propeller-heads/tycho/compare/0.336.1...0.337.0) (2026-07-16)
 
 

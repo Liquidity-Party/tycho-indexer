@@ -255,6 +255,15 @@ impl BlockHistory {
                 // earlier partial (or one for a block that is no longer the tip) legitimately
                 // cannot be found by hash. This is a catch-up, not a chain inconsistency.
                 BlockPosition::Delayed
+            } else if !block.revert && self.hash_in_history(&block.parent_hash) {
+                // A non-revert block whose own hash is unknown but whose parent is a known block
+                // in history is a competing branch at or below the tip (e.g. a sibling of the tip
+                // observed without an explicit revert). We cannot tell from a single header which
+                // sibling is canonical, so we do not flip the tip here. Classify it as Delayed:
+                // if it is the losing fork it simply waits, and if it is canonical the next block
+                // (number > tip) arrives as Advanced and triggers a block-history reinit that
+                // rebuilds from the synchronizers' converged headers.
+                BlockPosition::Delayed
             } else {
                 // anything else raises e.g. a completely detached, revert=false block
                 let history = &self.history;
@@ -507,6 +516,68 @@ mod test {
             .expect("failed to determine position");
 
         assert_eq!(result, BlockPosition::Delayed);
+    }
+
+    #[test]
+    fn test_sibling_of_tip_is_delayed() {
+        // A competing block arrives at the tip's height, sharing the tip's parent, with no
+        // explicit revert (regression: this used to return UndeterminedBlockPosition and kill the
+        // feed stream). We cannot know which sibling is canonical from one header, so it must
+        // classify as Delayed rather than flip the tip; recovery to the canonical branch happens
+        // via the Advanced -> reinit path once a higher block arrives.
+        let blocks = generate_blocks(10, 0, None);
+        let mut history = BlockHistory::new(blocks.clone(), 15).expect("failed to create history");
+
+        // Tip is a block 10 built on block 9.
+        let tip = BlockHeader {
+            number: 10,
+            hash: random_hash(),
+            parent_hash: int_hash(9),
+            ..Default::default()
+        };
+        history
+            .push(tip.clone())
+            .expect("push tip failed");
+
+        // A sibling: same height, same parent, different hash, non-revert.
+        let sibling = BlockHeader {
+            number: 10,
+            hash: random_hash(),
+            parent_hash: int_hash(9),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            history
+                .determine_block_position(&sibling)
+                .expect("should classify as delayed, not error"),
+            BlockPosition::Delayed
+        );
+
+        // The tip is not disturbed by classification.
+        history
+            .push(sibling)
+            .expect("push sibling failed");
+        assert_eq!(history.latest().unwrap().hash, tip.hash);
+    }
+
+    #[test]
+    fn test_detached_block_still_errors() {
+        // A non-revert block whose parent is unknown to history remains a hard error.
+        let blocks = generate_blocks(10, 0, None);
+        let history = BlockHistory::new(blocks, 15).expect("failed to create history");
+
+        let detached = BlockHeader {
+            number: 9,
+            hash: random_hash(),
+            parent_hash: random_hash(),
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            history.determine_block_position(&detached),
+            Err(BlockHistoryError::UndeterminedBlockPosition)
+        ));
     }
 
     // ==================== Partial Block Tests ====================
