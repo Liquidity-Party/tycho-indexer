@@ -1,3 +1,12 @@
+## [0.339.1](https://github.com/propeller-heads/tycho/compare/0.339.0...0.339.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **tycho-common:** stop AccountUpdate::merge erasing code and balance ([634488e](https://github.com/propeller-heads/tycho/commit/634488ea3165020197603a07286fed12ddfdb8c5))
+* **tycho-simulation:** decode proxy-token updates as Update, not Creation ([0a7a317](https://github.com/propeller-heads/tycho/commit/0a7a31724ba94c4d50959ff3554e965d5b74448c))
+* **tycho:** stop producing code-less Creation account updates ([#1218](https://github.com/propeller-heads/tycho/issues/1218)) ([b9a5375](https://github.com/propeller-heads/tycho/commit/b9a537525fdae2318dcfd134b5110393b9895d65))
+
 ## [0.339.0](https://github.com/propeller-heads/tycho/compare/0.338.1...0.339.0) (2026-07-17)
 
 
