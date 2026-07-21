@@ -39,26 +39,29 @@ const FEE_NUMERATOR: U256 = U256::from_limbs([9_970, 0, 0, 0]);
 /// wrapper and caps executable output independently from the pair's FewToken reserves.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RingSwapV2State {
-    pub component_id: String,
     pub reserve0: U256,
     pub reserve1: U256,
     pub backing0: U256,
     pub backing1: U256,
     pub token0: Bytes,
     pub token1: Bytes,
+    pub fw_token0: Bytes,
+    pub fw_token1: Bytes,
 }
 
 impl RingSwapV2State {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        component_id: String,
         reserve0: U256,
         reserve1: U256,
         backing0: U256,
         backing1: U256,
         token0: Bytes,
         token1: Bytes,
+        fw_token0: Bytes,
+        fw_token1: Bytes,
     ) -> Self {
-        Self { component_id, reserve0, reserve1, backing0, backing1, token0, token1 }
+        Self { reserve0, reserve1, backing0, backing1, token0, token1, fw_token0, fw_token1 }
     }
 
     fn zero_to_one(&self, token_in: &Token, token_out: &Token) -> bool {
@@ -82,8 +85,11 @@ impl RingSwapV2State {
         reserve_out: U256,
         output_backing: U256,
     ) -> Result<U256, SimulationError> {
+        if output_backing >= reserve_out {
+            return Ok(U256::MAX);
+        }
         let first_unexecutable_output = safe_add_u256(output_backing, U256::from(1))?;
-        if first_unexecutable_output >= reserve_out {
+        if first_unexecutable_output == reserve_out {
             return Ok(U256::MAX);
         }
 
@@ -138,16 +144,19 @@ impl RingSwapV2State {
     }
 
     fn apply_backing_updates(&mut self, balances: &Balances) {
-        if let Some(component_balances) = balances
-            .component_balances
-            .get(&self.component_id)
+        if let Some(balance) = balances
+            .account_balances
+            .get(&self.fw_token0)
+            .and_then(|balances| balances.get(&self.token0))
         {
-            if let Some(balance) = component_balances.get(&self.token0) {
-                self.backing0 = U256::from_be_slice(balance);
-            }
-            if let Some(balance) = component_balances.get(&self.token1) {
-                self.backing1 = U256::from_be_slice(balance);
-            }
+            self.backing0 = U256::from_be_slice(balance);
+        }
+        if let Some(balance) = balances
+            .account_balances
+            .get(&self.fw_token1)
+            .and_then(|balances| balances.get(&self.token1))
+        {
+            self.backing1 = U256::from_be_slice(balance);
         }
     }
 }
@@ -334,13 +343,14 @@ mod tests {
 
     fn state(backing1: u64) -> RingSwapV2State {
         RingSwapV2State::new(
-            "ring-pool".to_string(),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(backing1),
             address(1),
             address(2),
+            address(3),
+            address(4),
         )
     }
 
@@ -437,6 +447,19 @@ mod tests {
     }
 
     #[test]
+    fn backing_at_or_above_reserve_is_uncapped_without_overflow() {
+        assert_eq!(
+            RingSwapV2State::max_input_for_backing(
+                U256::from(1_000),
+                U256::from(1_000),
+                U256::MAX,
+            )
+            .unwrap(),
+            U256::MAX
+        );
+    }
+
+    #[test]
     fn uncapped_limits_report_the_exact_cpmm_output() {
         let state = state(10_000);
         let (max_input, max_output) = state
@@ -454,14 +477,14 @@ mod tests {
     }
 
     #[test]
-    fn component_backing_only_delta_updates_without_reserve_attributes() {
+    fn account_backing_only_delta_updates_without_reserve_attributes() {
         let mut state = state(10);
         let balances = Balances {
-            component_balances: HashMap::from([(
-                "ring-pool".to_string(),
+            component_balances: HashMap::new(),
+            account_balances: HashMap::from([(
+                address(4),
                 HashMap::from([(address(2), Bytes::from(vec![42]))]),
             )]),
-            account_balances: HashMap::new(),
         };
 
         state
@@ -471,6 +494,47 @@ mod tests {
         assert_eq!(state.reserve0, U256::from(1_000));
         assert_eq!(state.reserve1, U256::from(1_000));
         assert_eq!(state.backing1, U256::from(42));
+    }
+
+    #[test]
+    fn shared_wrapper_backing_update_applies_to_each_pool_state() {
+        let mut first_pool = state(10);
+        let mut second_pool = state(20);
+        let balances = Balances {
+            component_balances: HashMap::new(),
+            account_balances: HashMap::from([(
+                address(4),
+                HashMap::from([(address(2), Bytes::from(vec![42]))]),
+            )]),
+        };
+
+        first_pool
+            .delta_transition(ProtocolStateDelta::default(), &HashMap::new(), &balances)
+            .unwrap();
+        second_pool
+            .delta_transition(ProtocolStateDelta::default(), &HashMap::new(), &balances)
+            .unwrap();
+
+        assert_eq!(first_pool.backing1, U256::from(42));
+        assert_eq!(second_pool.backing1, U256::from(42));
+    }
+
+    #[test]
+    fn component_tvl_balances_do_not_override_wrapper_backing() {
+        let mut state = state(10);
+        let balances = Balances {
+            component_balances: HashMap::from([(
+                "ring-pool".to_string(),
+                HashMap::from([(address(2), Bytes::from(vec![99]))]),
+            )]),
+            account_balances: HashMap::new(),
+        };
+
+        state
+            .delta_transition(ProtocolStateDelta::default(), &HashMap::new(), &balances)
+            .unwrap();
+
+        assert_eq!(state.backing1, U256::from(10));
     }
 
     #[test]
