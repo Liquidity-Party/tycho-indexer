@@ -1,8 +1,4 @@
-use crate::{
-    abi,
-    params::DeploymentConfig,
-    utils::address_id,
-};
+use crate::{abi, params::DeploymentConfig, utils::address_id};
 use abi::{
     reclamm_pool_factory_contract::{
         events::PoolCreated as ReClammPoolCreated, functions::Create as ReClammPoolCreate,

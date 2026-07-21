@@ -129,11 +129,7 @@ pub fn map_pool_balance_seed_events(
 ) -> Result<BlockBalanceDeltas, anyhow::Error> {
     let config = DeploymentConfig::parse(&params)?;
     Ok(BlockBalanceDeltas {
-        balance_deltas: pool_balances::pool_balance_seed_deltas(
-            &block,
-            &store,
-            &config.vault,
-        ),
+        balance_deltas: pool_balances::pool_balance_seed_deltas(&block, &store, &config.vault),
     })
 }
 
@@ -323,8 +319,8 @@ pub fn map_protocol_changes(
         |addr| {
             components_store
                 .get_last(pool_store_key(addr))
-                .is_some()
-                || addr.eq(vault_address)
+                .is_some() ||
+                addr.eq(vault_address)
         },
         &mut transaction_changes,
     );
