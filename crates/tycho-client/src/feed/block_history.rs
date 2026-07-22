@@ -267,7 +267,8 @@ impl BlockHistory {
                 // sibling is canonical, so we do not flip the tip here. Classify it as Delayed:
                 // if it is the losing fork it simply waits, and if it is canonical the next block
                 // (number > tip) arrives as Advanced and triggers a block-history reinit that
-                // rebuilds from the synchronizers' converged headers.
+                // rebuilds from the retained history merged with the synchronizers' converged
+                // headers.
                 BlockPosition::Delayed
             } else {
                 // anything else raises e.g. a completely detached, revert=false block

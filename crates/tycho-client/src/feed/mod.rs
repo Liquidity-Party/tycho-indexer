@@ -976,11 +976,12 @@ where
             .ok_or(BlockHistoryError::EmptyHistory)?
             .clone();
         // Preserve the previously retained history so a revert to a block below the advanced tip
-        // can still find its fork point. Seeding only from current stream headers would root the
-        // new history at the advanced block and drop the ancestors a later revert needs, which
-        // surfaces as `RevertPositionNotFound` ("History exceeded"). `BlockHistory::new` keeps the
-        // longest connected chain ending at the latest header, so detached older blocks (a genuine
-        // gap, e.g. after a restart) are still discarded.
+        // can still find its fork point. Seeding only from current stream headers roots the new
+        // history at the oldest header the streams happen to hold, dropping the ancestors a later
+        // revert needs: a revert targeting that root drains the deque looking for its parent and
+        // fails with `RevertPositionNotFound` ("History exceeded"). `BlockHistory::new` keeps the
+        // connected chain ending at the highest-numbered header, so detached older blocks (a
+        // genuine gap, e.g. after a restart) are still discarded.
         let mut blocks: Vec<BlockHeader> = block_history
             .blocks()
             .cloned()
@@ -1494,6 +1495,42 @@ mod tests {
         new_history
             .push(revert)
             .expect("revert below advanced tip must not exceed history");
+    }
+
+    /// Preserving history must not resurrect blocks across a real gap. When the advanced block is
+    /// genuinely detached (e.g. a synchronizer restarted and jumped ahead), the retained blocks do
+    /// not connect to it and must still be discarded, leaving the history rooted at the advanced
+    /// block rather than stitching together a discontinuous chain.
+    #[test]
+    fn test_reinit_discards_retained_history_on_detached_advanced_block() {
+        let old_blocks = vec![
+            full_header(323, 323, 322),
+            full_header(324, 324, 323),
+            full_header(325, 325, 324),
+        ];
+        let mut old_history = BlockHistory::new(old_blocks, BLOCK_HISTORY_SIZE).unwrap();
+
+        // Advanced block is far ahead and its parent is unknown to the retained history.
+        let mut streams = vec![stream_in_state(
+            "aerodrome",
+            SynchronizerState::Advanced(full_header(400, 400, 399)),
+        )];
+
+        let new_history = BlockSynchronizer::<MockStateSync>::reinit_block_history(
+            &mut streams,
+            &mut old_history,
+        )
+        .expect("reinit failed");
+
+        let retained: Vec<u64> = new_history
+            .blocks()
+            .map(|b| b.number)
+            .collect();
+        assert_eq!(
+            retained,
+            vec![400],
+            "detached advanced block must not be stitched to old history"
+        );
     }
 
     #[test(tokio::test)]
