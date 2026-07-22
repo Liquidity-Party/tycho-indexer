@@ -1,3 +1,11 @@
+## [0.341.0](https://github.com/propeller-heads/tycho/compare/0.340.0...0.341.0) (2026-07-22)
+
+
+### Features
+
+* **testing:** support custom ports to run beside another tycho stack ([cdb6e4b](https://github.com/propeller-heads/tycho/commit/cdb6e4bff6630599c82c86755b437f54f9fd3a4b))
+* **testing:** support custom ports to run beside another tycho stack ([#1221](https://github.com/propeller-heads/tycho/issues/1221)) ([3fc41b7](https://github.com/propeller-heads/tycho/commit/3fc41b7034add38b8a869aa170a76bf4fb9a3621))
+
 ## [0.340.0](https://github.com/propeller-heads/tycho/compare/0.339.1...0.340.0) (2026-07-20)
 
 
