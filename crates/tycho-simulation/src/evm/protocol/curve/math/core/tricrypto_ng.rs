@@ -96,12 +96,19 @@ pub fn cbrt(x: U256) -> U256 {
 }
 
 /// Domain guard ported from the Vyper math contract's `get_y` safety asserts
-/// (`dev: unsafe values D` / `Unsafe values x[i]`).
+/// (`dev: unsafe values D` / `Unsafe values x[i]`):
+/// <https://github.com/curvefi/tricrypto-ng/blob/ecaa8161c240f21dd7c3712eefc5637e1dac742b/contracts/main/CurveCryptoMathOptimized3.vy#L48-L57>
+/// (`_newton_y` re-asserts the balance bounds at L250).
 ///
 /// The unchecked arithmetic in the solvers below is only sound inside this domain; the
 /// deployed contract reverts outside it, so quoting returns `None`. Without this guard,
 /// out-of-domain balances (e.g. an absurdly large `dx`) wrap the I256 cubic coefficients
 /// and drive `newton_y_3` into a division by zero.
+///
+/// The A and gamma asserts from the same block are intentionally not ported: pool
+/// parameters come from the deployed contract, which already enforces them at deploy
+/// time, while `D` and the balances are recomputed during simulation and can leave the
+/// domain through caller-supplied amounts.
 fn check_solver_domain(x: &[U256; 3], d: U256, i: usize) -> Option<()> {
     let p = |exp: u32| -> U256 { U256::from(10u64).pow(U256::from(exp)) };
     if d < p(17) || d > p(33) {
