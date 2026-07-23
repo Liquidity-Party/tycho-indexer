@@ -42,11 +42,13 @@ pub fn get_amount_out(
     }
 
     let wad = U256::from(WAD);
-    let price_scale_local = price_scale * precisions[1];
+    let price_scale_local = price_scale.checked_mul(precisions[1])?;
 
     let mut bal = *balances;
-    bal[i] += dx;
-    let xp: [U256; 2] = [bal[0] * precisions[0], bal[1] * price_scale_local / wad];
+    bal[i] = bal[i].checked_add(dx)?;
+    // Checked: an oversized dx must yield None, not wrap into a plausible-looking xp.
+    let xp: [U256; 2] =
+        [bal[0].checked_mul(precisions[0])?, bal[1].checked_mul(price_scale_local)? / wad];
 
     // NG uses Cardano cubic solver
     let (y, _k0) = get_y_2_ng(ann, gamma, xp, d, j)?;
@@ -93,19 +95,21 @@ pub fn get_amount_in(
 
     let wad = U256::from(WAD);
     let fee_denom = U256::from(FEE_DENOMINATOR);
-    let price_scale_local = price_scale * precisions[1];
+    let price_scale_local = price_scale.checked_mul(precisions[1])?;
 
     let xp_orig: [U256; 2] = [balances[0] * precisions[0], balances[1] * price_scale_local / wad];
 
     // First pass: estimate fee from pre-swap state
     let fee_est = crypto_fee(&xp_orig, mid_fee, out_fee, fee_gamma)?;
     let complement_est = fee_denom - fee_est;
-    let dy_native = (desired_output * fee_denom + complement_est - U256::from(1)) / complement_est;
+    // Checked: an oversized desired_output must yield None, not wrap.
+    let dy_native =
+        (desired_output.checked_mul(fee_denom)? + complement_est - U256::from(1)) / complement_est;
 
     let dy_internal = if j > 0 {
-        (dy_native * price_scale_local + wad - U256::from(1)) / wad
+        (dy_native.checked_mul(price_scale_local)? + wad - U256::from(1)) / wad
     } else {
-        dy_native * precisions[0]
+        dy_native.checked_mul(precisions[0])?
     } + U256::from(1);
     if xp_orig[j] <= dy_internal {
         return None;
@@ -121,12 +125,12 @@ pub fn get_amount_in(
     xp_after[j] = y;
     let fee_actual = crypto_fee(&xp_after, mid_fee, out_fee, fee_gamma)?;
     let complement_actual = fee_denom - fee_actual;
-    let dy_native =
-        (desired_output * fee_denom + complement_actual - U256::from(1)) / complement_actual;
+    let dy_native = (desired_output.checked_mul(fee_denom)? + complement_actual - U256::from(1)) /
+        complement_actual;
     let dy_internal = if j > 0 {
-        (dy_native * price_scale_local + wad - U256::from(1)) / wad
+        (dy_native.checked_mul(price_scale_local)? + wad - U256::from(1)) / wad
     } else {
-        dy_native * precisions[0]
+        dy_native.checked_mul(precisions[0])?
     } + U256::from(1);
     if xp_orig[j] <= dy_internal {
         return None;
@@ -226,6 +230,44 @@ pub fn spot_price(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// USDC-paired pool: USDC (6 dec) / 18-dec token at ~$0.50.
+    fn usdc_pool_amount_out(dx: U256) -> Option<U256> {
+        let wad = U256::from(1_000_000_000_000_000_000u128);
+        get_amount_out(
+            &[U256::from(2_000_000_000_000u64), U256::from(4_000_000u64) * wad],
+            &[U256::from(1_000_000_000_000u64), U256::from(1u64)],
+            U256::from(500_000_000_000_000_000u64),
+            U256::from(4u64) * U256::from(10u64).pow(U256::from(24u64)),
+            U256::from(540_000u64) * U256::from(10_000u64),
+            U256::from(11_809_167_828_997u64),
+            U256::from(3_000_000u64),
+            U256::from(30_000_000u64),
+            U256::from(230_000_000_000_000u64),
+            0,
+            1,
+            dx,
+        )
+    }
+
+    #[test]
+    fn get_amount_out_rejects_absurd_amount_in() {
+        let poison: U256 = "79274803880378691797489662351102500"
+            .parse()
+            .expect("literal");
+        assert!(usdc_pool_amount_out(poison).is_none());
+    }
+
+    #[test]
+    fn get_amount_out_rejects_amount_overflowing_xp() {
+        assert!(usdc_pool_amount_out(U256::MAX).is_none());
+    }
+
+    #[test]
+    fn get_amount_out_accepts_normal_amounts() {
+        let dy = usdc_pool_amount_out(U256::from(1_000_000_000u64)).expect("1k USDC quote");
+        assert!(dy > U256::ZERO);
+    }
 
     #[test]
     fn roundtrip() {
