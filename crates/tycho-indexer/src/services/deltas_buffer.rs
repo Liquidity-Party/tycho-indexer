@@ -215,8 +215,24 @@ impl PendingDeltas {
                 change_found = true
             }
 
-            // TODO: currently it is impossible to apply balance changes and state deltas since
-            //  we don't know the component_id of the contract.
+            // Apply pending account (token) balances too, keyed by contract address. Serving
+            // pending storage without them would return an account whose token balances lag
+            // its storage.
+            if let Some(token_balances) = entry
+                .account_balances
+                .get(&db_state.address)
+            {
+                for (token, balance) in token_balances {
+                    db_state
+                        .token_balances
+                        .insert(token.clone(), balance.clone());
+                }
+                change_found = true
+            }
+
+            // NOTE: state deltas and component balances can't be applied here — they are keyed
+            // by component_id, which we can't resolve from a contract address. They are applied
+            // in `update_native_state`, where the component_id is known.
         }
 
         Ok(change_found)
@@ -239,6 +255,17 @@ impl PendingDeltas {
                     let account_ref =
                         account.get_or_insert_with(|| delta.clone().into_account_without_tx());
                     account_ref.apply_delta(delta)?;
+                }
+                // Keep token balances consistent with the storage applied above (see
+                // `update_vm_state`). Only meaningful once the account exists via a delta.
+                if let Some(account_ref) = account.as_mut() {
+                    if let Some(token_balances) = entry.account_balances.get(&address) {
+                        for (token, balance) in token_balances {
+                            account_ref
+                                .token_balances
+                                .insert(token.clone(), balance.clone());
+                        }
+                    }
                 }
             }
         }
@@ -844,13 +871,24 @@ mod test {
             .insert(Arc::new(vm_block_deltas()))
             .unwrap();
         let address0 = Bytes::from("0x6F4Feb566b0f29e2edC231aDF88Fe7e1169D7c05");
+        let usdc = Bytes::from_str("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48").unwrap();
         let exp0 = Account::new(
             Chain::Ethereum,
             address0.clone(),
             "Contract1".to_string(),
             fixtures::slots([(1, 1), (2, 1)]),
             Bytes::from("0x00000000000000000000000000000000000000000000000000000000000007cf"),
-            HashMap::new(),
+            // Pending account (token) balances are applied on top of committed state now, so the
+            // latest buffered USDC balance (0x02) must be reflected.
+            HashMap::from([(
+                usdc.clone(),
+                AccountBalance {
+                    token: usdc.clone(),
+                    balance: Bytes::from("0x02"),
+                    modify_tx: Bytes::zero(32),
+                    account: address0.clone(),
+                },
+            )]),
             Bytes::from("0x0c0c0c"),
             Bytes::from("0xbabe"),
             Bytes::from("0x4200"),
