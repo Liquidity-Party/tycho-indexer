@@ -20,6 +20,11 @@ pub fn get_amount_out(
     j: usize,
     dx: U256,
 ) -> Option<U256> {
+    // Vyper pool contract: `assert i != j and i < N_COINS and j < N_COINS
+    //                        # dev: coin index out of range`
+    if i >= 3 || j >= 3 || i == j {
+        return None;
+    }
     if dx.is_zero() {
         return None;
     }
@@ -83,6 +88,11 @@ pub fn get_amount_in(
     j: usize,
     desired_output: U256,
 ) -> Option<U256> {
+    // Vyper pool contract: `assert i != j and i < N_COINS and j < N_COINS
+    //                        # dev: coin index out of range`
+    if i >= 3 || j >= 3 || i == j {
+        return None;
+    }
     if desired_output.is_zero() {
         return None;
     }
@@ -265,6 +275,68 @@ mod tests {
     #[test]
     fn get_amount_out_rejects_amount_overflowing_xp() {
         assert!(usdc_pool_amount_out(U256::MAX).is_none());
+    }
+
+    fn usdc_pool_with_indices(i: usize, j: usize, forward: bool, amount: U256) -> Option<U256> {
+        let wad = U256::from(1_000_000_000_000_000_000u128);
+        let balances = [
+            U256::from(7_000_000_000_000u64),
+            U256::from(6_000_000_000u64),
+            U256::from(1840u64) * wad,
+        ];
+        let precisions =
+            [U256::from(1_000_000_000_000u64), U256::from(10_000_000_000u64), U256::from(1u64)];
+        let price_scale = [U256::from(118_000u64) * wad, U256::from(3_800u64) * wad];
+        let d = U256::from(21u64) * U256::from(10u64).pow(U256::from(24u64));
+        let ann = U256::from(1707629u64) * U256::from(10_000u64);
+        let gamma = U256::from(11_809_167_828_997u64);
+        let (mid_fee, out_fee, fee_gamma) = (
+            U256::from(3_000_000u64),
+            U256::from(30_000_000u64),
+            U256::from(230_000_000_000_000u64),
+        );
+        if forward {
+            get_amount_out(
+                &balances,
+                &precisions,
+                &price_scale,
+                d,
+                ann,
+                gamma,
+                mid_fee,
+                out_fee,
+                fee_gamma,
+                i,
+                j,
+                amount,
+            )
+        } else {
+            get_amount_in(
+                &balances,
+                &precisions,
+                &price_scale,
+                d,
+                ann,
+                gamma,
+                mid_fee,
+                out_fee,
+                fee_gamma,
+                i,
+                j,
+                amount,
+            )
+        }
+    }
+
+    #[test]
+    fn rejects_out_of_range_coin_indices() {
+        let dx = U256::from(1_000_000_000u64);
+        for forward in [true, false] {
+            assert!(usdc_pool_with_indices(3, 2, forward, dx).is_none());
+            assert!(usdc_pool_with_indices(0, 3, forward, dx).is_none());
+            assert!(usdc_pool_with_indices(7, 9, forward, dx).is_none());
+            assert!(usdc_pool_with_indices(1, 1, forward, dx).is_none());
+        }
     }
 
     #[test]

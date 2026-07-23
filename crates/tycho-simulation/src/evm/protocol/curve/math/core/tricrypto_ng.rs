@@ -127,6 +127,9 @@ fn check_solver_domain(x: &[U256; 3], d: U256, i: usize) -> Option<()> {
 }
 
 pub fn newton_y_3(ann: U256, gamma: U256, x: [U256; 3], d: U256, j: usize) -> Option<U256> {
+    if j >= 3 {
+        return None;
+    }
     check_solver_domain(&x, d, j)?;
     let n = U256::from(3u64);
     let mut others: Vec<U256> = x
@@ -369,6 +372,13 @@ mod tests {
         let (ann, gamma, x, d) = realistic_params();
         let huge = U256::from(10u64).pow(U256::from(47u64));
         assert!(newton_y_3(ann, gamma, [huge, x[1], x[2]], d, 2).is_none());
+    }
+
+    #[test]
+    fn solvers_reject_out_of_range_index() {
+        let (ann, gamma, x, d) = realistic_params();
+        assert!(get_y_3_ng(ann, gamma, x, d, 3).is_none());
+        assert!(newton_y_3(ann, gamma, x, d, 3).is_none());
     }
 
     #[test]
