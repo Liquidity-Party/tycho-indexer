@@ -536,44 +536,45 @@ where
             })?;
         self.block_lasting_overwrites.clear();
 
-        // set balances
-        if !self.balances.is_empty() {
-            // Pool uses component balances for overwrites
+        // Set balances. Component balances and contract balances are refreshed independently:
+        // hybrid pools (e.g. Balancer V3) carry both, and `get_balance_overwrites` layers
+        // contract balances over component balances. Skipping the contract-balance refresh
+        // whenever component balances exist would freeze contract balances at their snapshot
+        // values while the contract's indexed storage keeps advancing, which breaks any
+        // simulation that compares `balanceOf` against stored reserves (e.g. Balancer V3
+        // `settle` reverting with `BalanceNotSettled`).
+        if let Some(bals) = balances
+            .component_balances
+            .get(&self.id)
+        {
+            // Merge delta balances with existing balances instead of replacing them
+            // Prevents errors when delta balance changes do not affect all the pool tokens.
+            for (token, bal) in bals {
+                let addr = bytes_to_address(token).map_err(|_| {
+                    SimulationError::FatalError(format!(
+                        "Invalid token address in balance update: {token:?}"
+                    ))
+                })?;
+                self.balances
+                    .insert(addr, U256::from_be_slice(bal));
+            }
+        }
+        for contract in &self.involved_contracts {
             if let Some(bals) = balances
-                .component_balances
-                .get(&self.id)
+                .account_balances
+                .get(&Bytes::from(contract.as_slice()))
             {
-                // Merge delta balances with existing balances instead of replacing them
-                // Prevents errors when delta balance changes do not affect all the pool tokens.
+                let contract_entry = self
+                    .contract_balances
+                    .entry(*contract)
+                    .or_default();
                 for (token, bal) in bals {
                     let addr = bytes_to_address(token).map_err(|_| {
                         SimulationError::FatalError(format!(
                             "Invalid token address in balance update: {token:?}"
                         ))
                     })?;
-                    self.balances
-                        .insert(addr, U256::from_be_slice(bal));
-                }
-            }
-        } else {
-            // Pool uses contract balances for overwrites
-            for contract in &self.involved_contracts {
-                if let Some(bals) = balances
-                    .account_balances
-                    .get(&Bytes::from(contract.as_slice()))
-                {
-                    let contract_entry = self
-                        .contract_balances
-                        .entry(*contract)
-                        .or_default();
-                    for (token, bal) in bals {
-                        let addr = bytes_to_address(token).map_err(|_| {
-                            SimulationError::FatalError(format!(
-                                "Invalid token address in balance update: {token:?}"
-                            ))
-                        })?;
-                        contract_entry.insert(addr, U256::from_be_slice(bal));
-                    }
+                    contract_entry.insert(addr, U256::from_be_slice(bal));
                 }
             }
         }
@@ -1653,6 +1654,48 @@ mod tests {
         assert_eq!(
             pool_state.block_overrides,
             Some(BlockEnvOverrides { number: Some(789), timestamp: Some(456) })
+        );
+    }
+
+    /// `update_pool_state` must refresh BOTH component balances and tracked contract balances,
+    /// not treat them as mutually exclusive. Balancer V3 is hybrid (component balances at the
+    /// vault owner + tracked vault contract balances); freezing contract balances while the
+    /// vault's indexed reserves advance is what caused the WETH-in `BalanceNotSettled` failures.
+    #[tokio::test]
+    async fn test_delta_transition_refreshes_both_balance_maps() {
+        let mut pool_state = setup_pool_state().await;
+        let vault = Address::from_str("0xBA12222222228d8Ba445958a75a0704d566BF2C8").unwrap();
+        // Non-manual pool (how Balancer V3 behaves once `manual_updates` is dropped): a contract
+        // change routes the pool through delta_transition, which refreshes its balances.
+        pool_state.manual_updates = false;
+        pool_state.involved_contracts = HashSet::from([vault]);
+        pool_state.contract_balances =
+            HashMap::from([(vault, HashMap::from([(dai_addr(), U256::from(1u64))]))]);
+
+        let delta = ProtocolStateDelta {
+            component_id: pool_state.id.clone(),
+            updated_attributes: HashMap::new(),
+            deleted_attributes: HashSet::new(),
+        };
+        let balances = Balances {
+            component_balances: HashMap::new(),
+            account_balances: HashMap::from([(
+                Bytes::from(vault.as_slice()),
+                HashMap::from([(dai().address.clone(), Bytes::from(42u64).lpad(32, 0))]),
+            )]),
+        };
+
+        // The spot-price refresh inside update_pool_state may fail in offline test
+        // environments; the balance bookkeeping this test guards happens before it.
+        let _ = pool_state.delta_transition(delta, &HashMap::new(), &balances);
+
+        // Contract balance refreshed even though component balances are non-empty (the old
+        // mutual-exclusion would have skipped this branch entirely).
+        assert_eq!(pool_state.contract_balances[&vault][&dai_addr()], U256::from(42u64));
+        // Component balances stay untouched by a contract-balance-only delta.
+        assert_eq!(
+            pool_state.balances[&dai_addr()],
+            U256::from_str("178754012737301807104").unwrap()
         );
     }
 
