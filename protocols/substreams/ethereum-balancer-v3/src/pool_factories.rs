@@ -71,7 +71,6 @@ pub fn address_map(
             ("pool_type", "WeightedPoolFactory".as_bytes()),
             ("normalized_weights", &normalized_weights_bytes),
             ("fee", &fee_bytes),
-            ("manual_updates", &[1u8]),
         ];
 
         if !rate_providers.is_empty() {
@@ -106,7 +105,6 @@ pub fn address_map(
             ("pool_type", "StablePoolFactory".as_bytes()),
             ("bpt", &pool),
             ("fee", &fee_bytes),
-            ("manual_updates", &[1u8]),
         ];
 
         if !rate_providers.is_empty() {
@@ -149,7 +147,6 @@ pub fn address_map(
         let mut attributes = vec![
             ("pool_type", "ReClammPoolFactory".as_bytes()),
             ("fee", &fee_bytes),
-            ("manual_updates", &[1u8]),
             ("initial_min_price", &initial_min_price_bytes),
             ("initial_max_price", &initial_max_price_bytes),
             ("initial_target_price", &initial_target_price_bytes),
