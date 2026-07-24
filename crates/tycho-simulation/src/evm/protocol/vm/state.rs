@@ -72,6 +72,9 @@ where
     /// triggers to recalculate spot prices ect. Default is to update on all changes on
     /// the pool.
     manual_updates: bool,
+    /// Caller (`tx.origin`) for the adapter's `price()` query; `None` defaults to
+    /// `EXTERNAL_ACCOUNT`. Set per protocol in the decoder (see `spot_price_caller`).
+    spot_price_caller: Option<Address>,
     /// The adapter contract. This is used to interact with the protocol when running simulations
     adapter_contract: TychoSimulationContract<D>,
     /// Tokens for which balance overwrites should be disabled.
@@ -138,6 +141,7 @@ where
         disable_overwrite_tokens: HashSet<Address>,
         self_contained_tokens: HashSet<Address>,
         block_overrides: Option<BlockEnvOverrides>,
+        spot_price_caller: Option<Address>,
     ) -> Self {
         Self {
             id,
@@ -154,6 +158,7 @@ where
             disable_overwrite_tokens,
             self_contained_tokens,
             block_overrides,
+            spot_price_caller,
             live_overrides: None,
         }
     }
@@ -356,6 +361,7 @@ where
                         buy_token_address,
                         vec![sell_amount_limit / U256::from(100)],
                         overwrites,
+                        self.spot_price_caller,
                         block_overrides.clone(),
                     )?;
 
@@ -744,6 +750,11 @@ where
     #[cfg(test)]
     pub fn get_manual_updates(&self) -> bool {
         self.manual_updates
+    }
+
+    #[cfg(test)]
+    pub fn get_spot_price_caller(&self) -> Option<Address> {
+        self.spot_price_caller
     }
 
     /// Simulates a sell of `amount_in` against `live_snapshot`'s overrides (or the plain indexed
