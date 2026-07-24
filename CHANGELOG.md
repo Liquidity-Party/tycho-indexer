@@ -1,3 +1,12 @@
+## [0.341.2](https://github.com/propeller-heads/tycho/compare/0.341.1...0.341.2) (2026-07-24)
+
+
+### Bug Fixes
+
+* **substreams:** pin tycho-substreams 0.8.1 across integrations ([b96762a](https://github.com/propeller-heads/tycho/commit/b96762ac31f8c08d6ee2b1d8d6c70b4e1ddac9c4)), closes [#1056](https://github.com/propeller-heads/tycho/issues/1056)
+* **substreams:** pin tycho-substreams 0.8.1 across integrations ([#1198](https://github.com/propeller-heads/tycho/issues/1198)) ([8c5caa1](https://github.com/propeller-heads/tycho/commit/8c5caa18f76341c31aa15c884f493dedc26daa8a))
+* **substreams:** remove dead SerializableVecBigInt trait ([2521479](https://github.com/propeller-heads/tycho/commit/2521479ba8f19dc2f2487429358a89a5b94e642f))
+
 ## [0.341.1](https://github.com/propeller-heads/tycho/compare/0.341.0...0.341.1) (2026-07-24)
 
 
