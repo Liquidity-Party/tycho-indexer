@@ -1,3 +1,10 @@
+## [0.341.4](https://github.com/propeller-heads/tycho/compare/0.341.3...0.341.4) (2026-07-24)
+
+
+### Bug Fixes
+
+* **fermiswap:** follow engine migration to 0x90f73fEA ([#1228](https://github.com/propeller-heads/tycho/issues/1228)) ([9606fc1](https://github.com/propeller-heads/tycho/commit/9606fc12a50b1d81d85365f9ac40737c2d369ffc))
+
 ## [0.341.3](https://github.com/propeller-heads/tycho/compare/0.341.2...0.341.3) (2026-07-24)
 
 
