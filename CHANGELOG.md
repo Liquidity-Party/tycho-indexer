@@ -1,3 +1,12 @@
+## [0.341.1](https://github.com/propeller-heads/tycho/compare/0.341.0...0.341.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* guard NG curve solvers against out-of-domain balances ([938fe8e](https://github.com/propeller-heads/tycho/commit/938fe8e3b223e31c6da1294e73d2fa7314d8abe5))
+* guard NG curve solvers against out-of-domain balances ([#1231](https://github.com/propeller-heads/tycho/issues/1231)) ([8778f9e](https://github.com/propeller-heads/tycho/commit/8778f9e0dfe4d1ff01c41aab6e71c45620b0eeb5))
+* reject out-of-range coin indices in NG curve math ([669af6d](https://github.com/propeller-heads/tycho/commit/669af6d06bd984603c8ebbadcc959aac9a7d0fe3))
+
 ## [0.341.0](https://github.com/propeller-heads/tycho/compare/0.340.0...0.341.0) (2026-07-22)
 
 
