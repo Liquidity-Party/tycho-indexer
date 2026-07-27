@@ -1,3 +1,11 @@
+## [0.341.5](https://github.com/propeller-heads/tycho/compare/0.341.4...0.341.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* preserve block history across reinit for flashblock reverts ([f1d7cee](https://github.com/propeller-heads/tycho/commit/f1d7cee3d0bf59e7e5541810f401195363dca6e3))
+* preserve block history across reinit for flashblock reverts ([#1224](https://github.com/propeller-heads/tycho/issues/1224)) ([86821a8](https://github.com/propeller-heads/tycho/commit/86821a868b2356ec9b08fed00ae1e08bbc964f9a))
+
 ## [0.341.4](https://github.com/propeller-heads/tycho/compare/0.341.3...0.341.4) (2026-07-24)
 
 
