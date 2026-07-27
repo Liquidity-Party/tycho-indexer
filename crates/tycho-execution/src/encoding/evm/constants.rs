@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::LazyLock,
+    time::Duration,
 };
 
 use tycho_common::{models::Chain, Bytes};
@@ -46,6 +47,32 @@ pub static ROUTER_ETH_ADDRESS: LazyLock<Bytes> = LazyLock::new(|| {
 /// Tycho Router, resulting in a higher gas usage. Fetching fewer blocks may result in attestations
 /// expiring if the transaction is not sent fast enough.
 pub const ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE: u64 = 5;
+
+/// The endpoint serving Angstrom pool unlock attestations.
+pub(crate) const ANGSTROM_DEFAULT_API_URL: &str =
+    "https://attestations.angstrom.xyz/getAttestations";
+
+/// The size of a single Angstrom attestation, without its block number prefix.
+///
+/// The Uniswap V4 executor rejects attestation data that is not a whole number of
+/// `8 + ANGSTROM_ATTESTATION_SIZE` byte entries.
+pub(crate) const ANGSTROM_ATTESTATION_SIZE: usize = 85;
+
+/// How long the background prefetcher waits between Angstrom attestation refreshes.
+///
+/// Shorter than a block, so that every block is encoded against a window fetched during the
+/// current or previous block.
+pub(crate) const ANGSTROM_ATTESTATION_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
+
+/// How old a cached Angstrom attestation window may be before it is refetched while encoding.
+///
+/// A window covers `ANGSTROM_BLOCKS_IN_FUTURE` blocks from the block it was fetched in, so it
+/// keeps covering upcoming blocks for a while after it was fetched. Two blocks of age leaves at
+/// least three covered blocks for the transaction to land in.
+pub(crate) const ANGSTROM_ATTESTATION_MAX_AGE: Duration = Duration::from_secs(24);
+
+/// How long a single request to the Angstrom API may take before it is aborted.
+pub(crate) const ANGSTROM_API_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// These protocols support the optimization of grouping swaps.
 ///
