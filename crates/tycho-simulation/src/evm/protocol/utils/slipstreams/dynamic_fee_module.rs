@@ -184,14 +184,21 @@ fn calculate_dynamic_fee(
     if observation_cardinality < (DEFAULT_SECONDS_AGO / MIN_SECONDS_AGO) as u16 {
         return Ok(0);
     };
-    let tw_avg_tick = match observations.observe(
+    // Mirror the on-chain module's `try pool.observe(...) { ... } catch { return 0; }`: a failed
+    // observation (e.g. a ring buffer Tycho only partially indexed) contributes no dynamic
+    // component instead of failing the whole quote.
+    let observed = match observations.observe(
         blocktime,
         &[DEFAULT_SECONDS_AGO, 0],
         current_tick,
         observation_index,
         liquidity,
         observation_cardinality,
-    )? {
+    ) {
+        Ok(observed) => observed,
+        Err(_) => return Ok(0),
+    };
+    let tw_avg_tick = match observed {
         (tick_cumulatives, _) if tick_cumulatives.len() >= 2 => {
             ((tick_cumulatives[1] - tick_cumulatives[0]) / DEFAULT_SECONDS_AGO as i64) as i32
         }
@@ -348,6 +355,33 @@ mod tests {
 
         let fee = get_dynamic_fee(&dfc, 3000, 0, 1, 0, 1, &observations, 100)
             .expect("Failed to calculate dynamic fee");
+
+        assert_eq!(fee, 3000);
+    }
+
+    #[test]
+    fn observe_failure_falls_back_to_base_fee() {
+        // cardinality clears the min-history guard but exceeds the indexed buffer, so observe()
+        // errors out of bounds. Like the on-chain try/catch, the dynamic component is 0 and the
+        // fee falls back to the base fee, instead of failing the quote.
+        let dfc = DynamicFeeConfig::default();
+        let observations = Observations::new(vec![
+            Observation {
+                block_timestamp: 999_000,
+                initialized: true,
+                index: 0,
+                ..Default::default()
+            },
+            Observation {
+                block_timestamp: 999_500,
+                initialized: true,
+                index: 1,
+                ..Default::default()
+            },
+        ]);
+
+        let fee = get_dynamic_fee(&dfc, 3000, 0, 1, 1, 300, &observations, 1_000_000)
+            .expect("observe failure should fall back to the base fee, not error");
 
         assert_eq!(fee, 3000);
     }
