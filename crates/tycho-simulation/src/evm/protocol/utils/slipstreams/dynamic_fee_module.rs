@@ -19,7 +19,7 @@ const SUPPORTED_DYNAMIC_FEE_MODULES: [Address; 2] = [
 ];
 const DYNAMIC_FEE_MODULE_ATTRIBUTE: &str = "dynamic_fee_module";
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicFeeConfig {
     base_fee: u32,
     fee_cap: u32,
@@ -47,9 +47,9 @@ impl DynamicFeeConfig {
 
     /// Builds a config from a full snapshot's attributes.
     ///
-    /// Errors when the `dynamic_fee_module` marker is absent or is not one of the supported
-    /// replacement deployments, so the caller can skip the pool rather than trust stale fee
-    /// attributes left by a retired module. The error message is complete and ready to wrap.
+    /// An absent or unsupported `dynamic_fee_module` marker yields the default config, whose
+    /// `base_fee == 0` makes `get_dynamic_fee` fall back to the pool's static `default_fee`. Only
+    /// errors when a supported marker is present but a dynamic-fee attribute is missing.
     pub(crate) fn from_attributes(
         attributes: &HashMap<String, Bytes>,
     ) -> Result<Self, &'static str> {
@@ -57,7 +57,7 @@ impl DynamicFeeConfig {
             .get(DYNAMIC_FEE_MODULE_ATTRIBUTE)
             .is_some_and(|module| is_supported_dynamic_fee_module(module))
         {
-            return Err("dynamic fee module is missing or not one of the supported deployments");
+            return Ok(Self::default());
         }
 
         Ok(Self {
@@ -92,9 +92,8 @@ impl DynamicFeeConfig {
 
     /// Applies a delta's attribute updates.
     ///
-    /// A delta carrying the `dynamic_fee_module` marker fully re-initializes the config (and errors
-    /// on an unsupported module); markerless deltas apply only the dynamic-fee fields they contain,
-    /// leaving the rest untouched.
+    /// A delta carrying the `dynamic_fee_module` marker fully re-initializes the config; markerless
+    /// deltas apply only the dynamic-fee fields they contain, leaving the rest untouched.
     pub(crate) fn update_from_attributes(
         &mut self,
         attributes: &HashMap<String, Bytes>,
@@ -322,7 +321,8 @@ mod tests {
     #[rstest]
     #[case::missing_module(None)]
     #[case::unsupported_module(Some(Bytes::from([0x11; 20])))]
-    fn from_attributes_rejects_unsupported_modules(#[case] module: Option<Bytes>) {
+    fn from_attributes_defaults_for_missing_or_unsupported_module(#[case] module: Option<Bytes>) {
+        // Attributes are present but untrusted without a supported marker: fall back to default.
         let mut attributes = HashMap::from([
             ("dfc_baseFee".to_string(), Bytes::from(200_u32.to_be_bytes())),
             ("dfc_feeCap".to_string(), Bytes::from(1_000_u32.to_be_bytes())),
@@ -332,6 +332,23 @@ mod tests {
             attributes.insert(DYNAMIC_FEE_MODULE_ATTRIBUTE.to_string(), module);
         }
 
-        assert!(DynamicFeeConfig::from_attributes(&attributes).is_err());
+        assert_eq!(DynamicFeeConfig::from_attributes(&attributes), Ok(DynamicFeeConfig::default()));
+    }
+
+    #[test]
+    fn default_config_falls_back_to_static_default_fee() {
+        // base_fee == 0 must resolve to the pool's static default fee (3000 here).
+        let dfc = DynamicFeeConfig::default();
+        let observations = Observations::new(vec![Observation {
+            block_timestamp: 100,
+            initialized: true,
+            index: 0,
+            ..Default::default()
+        }]);
+
+        let fee = get_dynamic_fee(&dfc, 3000, 0, 1, 0, 1, &observations, 100)
+            .expect("Failed to calculate dynamic fee");
+
+        assert_eq!(fee, 3000);
     }
 }
