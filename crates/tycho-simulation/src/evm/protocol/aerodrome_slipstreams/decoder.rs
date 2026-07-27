@@ -296,18 +296,17 @@ mod tests {
     #[case::missing_module(None)]
     #[case::stale_module(Some(Bytes::from(STALE_DYNAMIC_FEE_MODULE)))]
     #[tokio::test]
-    async fn unsupported_dynamic_fee_module_fails_to_decode(
+    async fn missing_or_unsupported_module_falls_back_to_default_config(
         #[case] dynamic_fee_module: Option<Bytes>,
     ) {
+        // Still decodable with a default config, not dropped: these pools quote their default_fee.
         let decoded = try_decode_snapshot_with_defaults::<AerodromeSlipstreamsState>(snapshot(
             dynamic_fee_module,
         ))
-        .await;
+        .await
+        .expect("pools without a supported marker should remain decodable");
 
-        assert!(
-            matches!(decoded, Err(InvalidSnapshotError::ValueError(_))),
-            "unsupported modules should be skipped, got {decoded:?}"
-        );
+        assert_eq!(decoded, expected_state(DynamicFeeConfig::default()));
     }
 
     #[rstest]

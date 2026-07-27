@@ -707,17 +707,22 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_fee_update_rejects_unsupported_module() {
+    fn dynamic_fee_update_falls_back_to_default_for_unsupported_module() {
+        // An unsupported-module delta resets to default rather than erroring; pool keeps
+        // default_fee.
         let mut pool = create_basic_test_pool();
         pool.dfc = DynamicFeeConfig::new(4500, 10_000, 1, false, 0);
         let delta =
             dynamic_fee_delta(hex_literal::hex!("DB45818A6db280ecfeB33cbeBd445423d0216b5D"));
 
-        let result = pool.delta_transition(delta, &HashMap::new(), &Balances::default());
+        pool.delta_transition(delta, &HashMap::new(), &Balances::default())
+            .expect("unsupported module delta should decode to the default config");
 
-        assert!(
-            matches!(result, Err(TransitionError::DecodeError(_))),
-            "unsupported module deltas should be rejected, got {result:?}"
+        assert_eq!(pool.dfc, DynamicFeeConfig::default());
+        assert_eq!(
+            pool.get_fee()
+                .expect("fee should be computable"),
+            3000
         );
     }
 
