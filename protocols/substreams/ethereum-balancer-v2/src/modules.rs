@@ -234,26 +234,12 @@ pub fn map_protocol_changes(
                             builder.add_entrypoint_params(&entrypoint_params);
                         }
                     }
-
-                    let mut component = component.clone();
-                    let fee_idx = component
-                        .static_att
-                        .iter()
-                        .position(|a| a.name == "fee");
-                    let fee_value = fee_idx.map(|idx| component.static_att.remove(idx).value);
-
-                    let mut attributes = default_attributes.clone();
-                    if let Some(fee) = fee_value {
-                        attributes.push(Attribute {
-                            name: "fee".to_string(),
-                            value: fee,
-                            change: ChangeType::Creation.into(),
-                        });
-                    }
-
-                    builder.add_protocol_component(&component);
-                    let entity_change =
-                        EntityChanges { component_id: component.id.clone(), attributes };
+                    
+                    builder.add_protocol_component(component);
+                    let entity_change = EntityChanges {
+                        component_id: component.id.clone(),
+                        attributes: default_attributes.clone(),
+                    };
                     builder.add_entity_change(&entity_change)
                 });
         });
