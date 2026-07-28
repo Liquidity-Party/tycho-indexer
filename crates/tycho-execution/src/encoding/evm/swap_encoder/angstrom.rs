@@ -32,10 +32,6 @@ static CACHE: OnceLock<Arc<AttestationCache>> = OnceLock::new();
 
 /// The attestation window every Angstrom swap encodes, kept warm by a background thread.
 ///
-/// One cache exists per process, shared by every swap encoder through `global`. Callers only
-/// need two methods: `global` to obtain the cache and start its refresh thread, and `hook_data`
-/// to read the current window while encoding. Everything below those two is internal.
-///
 /// Every refresh replaces the whole window rather than appending to it, so the cache holds one
 /// window of `ANGSTROM_BLOCKS_IN_FUTURE + 1` attestations at a time and does not grow with
 /// uptime.
@@ -348,6 +344,73 @@ mod tests {
         cache.refresh().unwrap_err();
 
         assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
+    }
+
+    /// Reads the current block number over JSON-RPC, using `RPC_URL`.
+    fn current_block_number() -> u64 {
+        let url = env::var("RPC_URL").expect("RPC_URL must be set");
+        let response: serde_json::Value = reqwest::blocking::Client::new()
+            .post(url)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1
+            }))
+            .send()
+            .expect("the RPC must answer")
+            .json()
+            .expect("the RPC must return JSON");
+
+        let block_number = response["result"]
+            .as_str()
+            .expect("eth_blockNumber must return a result");
+
+        u64::from_str_radix(block_number.trim_start_matches("0x"), 16)
+            .expect("eth_blockNumber must return a hex number")
+    }
+
+    /// Guards the assumption the whole cache rests on: that a fetched window brackets the block
+    /// the transaction will land in. Nothing in the encoder checks the block numbers it encodes,
+    /// so an API that started returning only past blocks would otherwise go unnoticed.
+    #[test]
+    #[ignore] // Performs real Angstrom API and RPC calls
+    fn test_live_window_brackets_the_current_block() {
+        let api = ApiConfig::from_env().expect("ANGSTROM_API_KEY must be set");
+
+        // Fetch the window first: a block arriving before the RPC call keeps the head inside the
+        // window, whereas one arriving after would push the window past the head.
+        let response = api
+            .fetch_off_runtime()
+            .expect("the Angstrom API must answer");
+        let head = current_block_number();
+
+        let mut blocks: Vec<u64> = response
+            .attestations
+            .iter()
+            .map(|attestation| attestation.block_number)
+            .collect();
+        blocks.sort_unstable();
+
+        assert_eq!(
+            blocks.len() as u64,
+            ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE + 1,
+            "expected the current block plus {ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE} future ones, \
+             got {blocks:?}"
+        );
+        assert!(
+            blocks
+                .windows(2)
+                .all(|pair| pair[1] == pair[0] + 1),
+            "attested blocks are not consecutive: {blocks:?}"
+        );
+        assert!(
+            blocks.contains(&head),
+            "window {blocks:?} does not cover the current block {head}"
+        );
+        assert!(
+            blocks
+                .last()
+                .is_some_and(|last| *last > head),
+            "window {blocks:?} leaves no future block for the transaction to land in, head {head}"
+        );
     }
 
     #[test]
