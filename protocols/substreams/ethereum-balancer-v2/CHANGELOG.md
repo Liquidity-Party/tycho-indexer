@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.4
+## v0.5.0
 
 - Ensure Balancer V2 swap fees are exported as dynamic attributes instead of static.
   Adds an event listener for `SwapFeePercentageChanged` so `fee` correctly tracks
