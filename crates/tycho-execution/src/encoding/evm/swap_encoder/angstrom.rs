@@ -35,9 +35,14 @@ static CACHE: OnceLock<Arc<AttestationCache>> = OnceLock::new();
 /// One cache exists per process, shared by every swap encoder through `global`. Callers only
 /// need two methods: `global` to obtain the cache and start its refresh thread, and `hook_data`
 /// to read the current window while encoding. Everything below those two is internal.
+///
+/// Every refresh replaces the whole window rather than appending to it, so the cache holds one
+/// window of `ANGSTROM_BLOCKS_IN_FUTURE + 1` attestations at a time and does not grow with
+/// uptime.
 pub(crate) struct AttestationCache {
     /// The configured API client, or the reason Angstrom swaps cannot be encoded.
     api: Result<ApiConfig, String>,
+    /// The window from the most recent successful fetch, or `None` until the first one lands.
     latest: RwLock<Option<CachedWindow>>,
 }
 
