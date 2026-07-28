@@ -1304,7 +1304,7 @@ impl TestRunner {
             let success = match results.get(simulation_id) {
                 Some(TychoExecutionResult::Success { amount_out, .. }) => {
                     info!(
-                        "[{}] Execution passed: {} {} -> {} {}",
+                        "[{}] Execution returned: {} {} -> {} {}",
                         expected_input.component_id,
                         expected_input.solution.amount_in(),
                         expected_input.token_in,
