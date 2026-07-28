@@ -77,6 +77,9 @@ static CLONE_TO_BASE_PROTOCOL: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| 
     ])
 });
 
+/// Largest relative difference tolerated between the simulated and the executed amount out.
+const MAX_EXECUTION_SLIPPAGE: f64 = 0.005;
+
 pub enum TestType {
     Full(TestTypeFull),
     Range(TestTypeRange),
@@ -1318,10 +1321,10 @@ impl TestRunner {
                     let slippage: BigRational =
                         BigRational::new(diff.abs(), BigInt::from(amount_out.clone()));
 
-                    if slippage.to_f64() > Some(0.005) {
+                    if slippage.to_f64() > Some(MAX_EXECUTION_SLIPPAGE) {
                         error!(
-                            "[{}] Execution amount and simulation amount differ more than 0.05% for {}: simulation={}, execution={}",
-                            expected_input.component_id, simulation_id, expected_input.expected_amount_out, amount_out
+                            "[{}] Execution amount and simulation amount differ more than {}% for {}: simulation={}, execution={}",
+                            expected_input.component_id, MAX_EXECUTION_SLIPPAGE * 100.0, simulation_id, expected_input.expected_amount_out, amount_out
                         );
                         false
                     } else {
