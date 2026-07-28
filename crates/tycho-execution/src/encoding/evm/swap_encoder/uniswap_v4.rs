@@ -597,8 +597,23 @@ mod tests {
                 format!("{}{}", encode(&first_encoded), encode(ple_encode(vec![second_encoded])));
 
             write_calldata_to_file("test_encode_angstrom_grouped_swap", combined_hex.as_str());
-            // Any different length could indicate we didn't encode attestation data
-            assert!(combined_hex.len() == 2510);
+
+            // Both hops carry the same attestation window, on top of 140 bytes of pool params:
+            // 90 for the first swap and 50 for the length-prefixed second one. The API decides
+            // how many attestations a window holds, so assert the shape rather than the count.
+            const POOL_PARAMS_HEX: usize = 280;
+            const ATTESTATION_HEX_PER_HOP: usize = 186;
+            let attestation_hex = combined_hex
+                .len()
+                .checked_sub(POOL_PARAMS_HEX)
+                .expect("calldata is shorter than the pool params alone");
+
+            assert!(attestation_hex > 0, "no attestation data encoded");
+            assert_eq!(
+                attestation_hex % (2 * ATTESTATION_HEX_PER_HOP),
+                0,
+                "attestation data is not a whole number of attestations on both hops"
+            );
         }
     }
 }
