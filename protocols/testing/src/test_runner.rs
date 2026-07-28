@@ -16,7 +16,7 @@ use figment::{
 };
 use futures::StreamExt;
 use itertools::Itertools;
-use miette::{miette, IntoDiagnostic, WrapErr};
+use miette::{ensure, miette, IntoDiagnostic, WrapErr};
 use num_bigint::{BigInt, BigUint};
 use num_rational::BigRational;
 use num_traits::{Signed, ToPrimitive, Zero};
@@ -1298,7 +1298,7 @@ impl TestRunner {
         let mut failure_count = 0;
 
         for (simulation_id, expected_input) in &filtered_execution_data {
-            match results.get(simulation_id) {
+            let success = match results.get(simulation_id) {
                 Some(TychoExecutionResult::Success { amount_out, .. }) => {
                     info!(
                         "[{}] Execution passed: {} {} -> {} {}",
@@ -1319,40 +1319,51 @@ impl TestRunner {
                         BigRational::new(diff.abs(), BigInt::from(amount_out.clone()));
 
                     if slippage.to_f64() > Some(0.005) {
-                        failure_count += 1;
                         error!(
                             "[{}] Execution amount and simulation amount differ more than 0.05% for {}: simulation={}, execution={}",
                             expected_input.component_id, simulation_id, expected_input.expected_amount_out, amount_out
                         );
+                        false
                     } else {
-                        success_count += 1;
+                        true
                     }
                 }
                 Some(TychoExecutionResult::Revert { reason, .. }) => {
-                    failure_count += 1;
                     error!(
                         "[{}] Execution reverted for {}: {}",
                         expected_input.component_id, simulation_id, reason
                     );
+                    false
                 }
                 Some(TychoExecutionResult::Failed { error_msg }) => {
-                    failure_count += 1;
                     error!(
                         "[{}] Execution failed for {}: {}",
                         expected_input.component_id, simulation_id, error_msg
                     );
+                    false
                 }
                 None => {
-                    failure_count += 1;
                     error!(
                         "[{}] No result found for simulation {}",
                         expected_input.component_id, simulation_id
                     );
+                    false
                 }
+            };
+
+            if success {
+                success_count += 1;
+            } else {
+                failure_count += 1;
             }
         }
 
         info!("Batch execution complete: {} successes, {} failures", success_count, failure_count);
+
+        ensure!(
+            failure_count.is_zero(),
+            "Execution validation failed: {success_count} successes, {failure_count} failures"
+        );
 
         Ok(())
     }
