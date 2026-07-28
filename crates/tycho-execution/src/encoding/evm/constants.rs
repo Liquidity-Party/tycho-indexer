@@ -64,12 +64,26 @@ pub(crate) const ANGSTROM_ATTESTATION_SIZE: usize = 85;
 /// current or previous block.
 pub(crate) const ANGSTROM_ATTESTATION_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
+/// Ethereum's slot time, used to express the attestation window's block span as an age.
+///
+/// Slots are fixed at 12 seconds and can only be missed, never shortened, so treating every
+/// 12 seconds as a block always overestimates how many blocks have elapsed.
+const ETHEREUM_SLOT_SECS: u64 = 12;
+
+/// How many of the fetched window's blocks may elapse before the cache refetches while encoding.
+///
+/// A window fetched during block `N` covers `N` through `N + ANGSTROM_BLOCKS_IN_FUTURE`, so this
+/// spends part of that span and leaves the rest for the transaction to land in. At the default of
+/// 5 blocks in the future, 2 blocks of age leaves 3 covered blocks. Raising it past half the
+/// window leaves too little runway; the transaction would land after the last attested block.
+const ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS: u64 = 2;
+
 /// How old a cached Angstrom attestation window may be before it is refetched while encoding.
 ///
-/// A window covers `ANGSTROM_BLOCKS_IN_FUTURE` blocks from the block it was fetched in, so it
-/// keeps covering upcoming blocks for a while after it was fetched. Two blocks of age leaves at
-/// least three covered blocks for the transaction to land in.
-pub(crate) const ANGSTROM_ATTESTATION_MAX_AGE: Duration = Duration::from_secs(24);
+/// Only reached when the background refresh has stopped keeping up: a healthy refresher replaces
+/// the window every `ANGSTROM_ATTESTATION_REFRESH_INTERVAL`.
+pub(crate) const ANGSTROM_ATTESTATION_MAX_AGE: Duration =
+    Duration::from_secs(ETHEREUM_SLOT_SECS * ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS);
 
 /// How long a single request to the Angstrom API may take before it is aborted.
 pub(crate) const ANGSTROM_API_TIMEOUT: Duration = Duration::from_secs(2);
