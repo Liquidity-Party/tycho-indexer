@@ -7,8 +7,8 @@
 //!
 //! Attestations are therefore fetched by a background thread into a process-wide cache and read
 //! from that cache while encoding, which keeps the Angstrom API's latency off the encoding path.
-//! The API returns a window covering the next [`ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE`] blocks; the
-//! executor picks the entry matching `block.number` on chain and ignores the rest.
+//! The API returns a window covering the next `ANGSTROM_BLOCKS_IN_FUTURE` blocks; the executor
+//! picks the entry matching `block.number` on chain and ignores the rest.
 
 use std::{
     env,
@@ -30,99 +30,105 @@ use crate::encoding::{
 
 static CACHE: OnceLock<Arc<AttestationCache>> = OnceLock::new();
 
-/// The attestation unlocking Angstrom's pools for one block.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct AttestationData {
-    #[serde(rename = "blockNumber")]
-    pub(crate) block_number: u64,
-    #[serde(rename = "unlockData")]
-    pub(crate) attestation: String,
+/// The attestation window every Angstrom swap encodes, kept warm by a background thread.
+///
+/// One cache exists per process, shared by every swap encoder through `global`. Callers only
+/// need two methods: `global` to obtain the cache and start its refresh thread, and `hook_data`
+/// to read the current window while encoding. Everything below those two is internal.
+pub(crate) struct AttestationCache {
+    /// The configured API client, or the reason Angstrom swaps cannot be encoded.
+    api: Result<ApiConfig, String>,
+    latest: RwLock<Option<CachedWindow>>,
 }
 
-/// Response from the Angstrom attestation API.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct AttestationResponse {
-    pub(crate) success: bool,
-    pub(crate) attestations: Vec<AttestationData>,
-}
+impl AttestationCache {
+    /// Returns the process-wide cache, starting its refresh thread on the first call.
+    ///
+    /// The thread is only started when the Angstrom API is configured, and then runs for the
+    /// lifetime of the process. Call this as early as possible so that the first encoded swap
+    /// already finds a warm cache.
+    pub(crate) fn global() -> &'static Arc<Self> {
+        CACHE.get_or_init(|| {
+            let cache = Arc::new(Self { api: ApiConfig::from_env(), latest: RwLock::new(None) });
+            Arc::clone(&cache).spawn_refresher();
+            cache
+        })
+    }
 
-/// Encodes attestations into the `hookData` layout the Uniswap V4 executor expects.
-///
-/// Every attestation takes exactly `8 + ANGSTROM_ATTESTATION_SIZE` bytes: a big endian block
-/// number followed by the attestation itself. Entries for blocks that have already passed are
-/// harmless, since the executor selects the entry matching `block.number`.
-///
-/// Returns an error if an attestation is not [`ANGSTROM_ATTESTATION_SIZE`] bytes long, which the
-/// executor would reject on chain.
-fn encode_attestations(response: &AttestationResponse) -> Result<Vec<u8>, EncodingError> {
-    let mut encoded =
-        Vec::with_capacity(response.attestations.len() * (8 + ANGSTROM_ATTESTATION_SIZE));
-    for data in &response.attestations {
-        let attestation_hex = data
-            .attestation
-            .strip_prefix("0x")
-            .unwrap_or(&data.attestation);
+    /// Returns the attestation bytes to pass as `hookData` for a swap on an Angstrom pool.
+    ///
+    /// Costs no network access while the background refresh is healthy. A window older than
+    /// `ANGSTROM_ATTESTATION_MAX_AGE`, or a cache that has never been filled, falls back to a
+    /// single blocking fetch so that encoding still succeeds at the cost of one API round trip.
+    ///
+    /// Returns an error if the fallback fetch fails, or if it is needed while the Angstrom API
+    /// is unconfigured.
+    pub(crate) fn hook_data(&self) -> Result<Vec<u8>, EncodingError> {
+        let latest = self
+            .latest
+            .read()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(window) = latest.as_ref() {
+            if window.fetched_at.elapsed() <= ANGSTROM_ATTESTATION_MAX_AGE {
+                return Ok(window.encoded.clone());
+            }
+        }
+        drop(latest);
 
-        let attestation = hex::decode(attestation_hex).map_err(|e| {
-            EncodingError::FatalError(format!(
-                "Failed to decode Angstrom attestation for block {}: {}",
-                data.block_number, e
-            ))
-        })?;
+        warn!("Angstrom attestation cache is cold or stale, fetching while encoding");
+        self.refresh()
+    }
 
-        if attestation.len() != ANGSTROM_ATTESTATION_SIZE {
-            return Err(EncodingError::FatalError(format!(
-                "Angstrom attestation for block {} is {} bytes, expected {}",
-                data.block_number,
-                attestation.len(),
-                ANGSTROM_ATTESTATION_SIZE
-            )));
+    /// Fetches the current attestation window into the cache and returns it.
+    fn refresh(&self) -> Result<Vec<u8>, EncodingError> {
+        let api = self
+            .api
+            .as_ref()
+            .map_err(|reason| EncodingError::FatalError(reason.clone()))?;
+
+        let encoded = encode_attestations(&api.fetch_off_runtime()?)?;
+        *self
+            .latest
+            .write()
+            .unwrap_or_else(PoisonError::into_inner) =
+            Some(CachedWindow { encoded: encoded.clone(), fetched_at: Instant::now() });
+
+        Ok(encoded)
+    }
+
+    /// Spawns the thread that keeps the cache warm, leaving the previous window in place
+    /// whenever a refresh fails.
+    ///
+    /// A dedicated thread is used rather than a `tokio` task so that the encoder works whether
+    /// or not its consumer runs a runtime, and because the blocking API client cannot be driven
+    /// from inside one.
+    fn spawn_refresher(self: Arc<Self>) {
+        if self.api.is_err() {
+            return;
         }
 
-        encoded.extend_from_slice(&data.block_number.to_be_bytes());
-        encoded.extend_from_slice(&attestation);
-    }
+        let spawned = thread::Builder::new()
+            .name("angstrom-attestations".to_string())
+            .spawn(move || loop {
+                if let Err(e) = self.refresh() {
+                    warn!("Angstrom attestation refresh failed: {e}");
+                }
+                thread::sleep(ANGSTROM_ATTESTATION_REFRESH_INTERVAL);
+            });
 
-    Ok(encoded)
-}
-
-/// Angstrom API access, or the reason why it is unavailable.
-enum Api {
-    Ready(ApiConfig),
-    Unavailable(String),
-}
-
-impl Api {
-    /// Reads the Angstrom API configuration from the environment.
-    ///
-    /// Returns `Api::Unavailable` when `ANGSTROM_API_KEY` is unset, which is how consumers that
-    /// do not route over Angstrom opt out.
-    fn from_env() -> Self {
-        let Ok(key) = env::var("ANGSTROM_API_KEY") else {
-            return Self::Unavailable(
-                "ANGSTROM_API_KEY environment variable is required for Angstrom swaps".to_string(),
+        if let Err(e) = spawned {
+            warn!(
+                "Failed to start the Angstrom attestation refresher: {e}. Attestations will be \
+                 fetched while encoding instead."
             );
-        };
-
-        let client = reqwest::blocking::Client::builder()
-            .timeout(ANGSTROM_API_TIMEOUT)
-            .build();
-        let client = match client {
-            Ok(client) => client,
-            Err(e) => {
-                return Self::Unavailable(format!("Failed to build the Angstrom API client: {e}"))
-            }
-        };
-
-        let url =
-            env::var("ANGSTROM_API_URL").unwrap_or_else(|_| ANGSTROM_DEFAULT_API_URL.to_string());
-        let blocks_in_future = env::var("ANGSTROM_BLOCKS_IN_FUTURE")
-            .ok()
-            .and_then(|blocks| blocks.parse().ok())
-            .unwrap_or(ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE);
-
-        Self::Ready(ApiConfig { client, url, key, blocks_in_future })
+        }
     }
+}
+
+/// An encoded attestation window and the time it was fetched.
+struct CachedWindow {
+    encoded: Vec<u8>,
+    fetched_at: Instant,
 }
 
 /// A single Angstrom API client, reused across fetches to keep its connection pool warm.
@@ -134,10 +140,47 @@ struct ApiConfig {
 }
 
 impl ApiConfig {
-    /// Fetches the current attestation window.
+    /// Reads the Angstrom API configuration from the environment.
     ///
-    /// Must not be called from within an async runtime: the request is blocking. Use
-    /// [`fetch_off_runtime`] when the calling thread may be running inside one.
+    /// Returns the reason Angstrom swaps cannot be encoded when `ANGSTROM_API_KEY` is unset,
+    /// which is how consumers that do not route over Angstrom opt out.
+    fn from_env() -> Result<Self, String> {
+        let key = env::var("ANGSTROM_API_KEY").map_err(|_| {
+            "ANGSTROM_API_KEY environment variable is required for Angstrom swaps".to_string()
+        })?;
+
+        let client = reqwest::blocking::Client::builder()
+            .timeout(ANGSTROM_API_TIMEOUT)
+            .build()
+            .map_err(|e| format!("Failed to build the Angstrom API client: {e}"))?;
+
+        let url =
+            env::var("ANGSTROM_API_URL").unwrap_or_else(|_| ANGSTROM_DEFAULT_API_URL.to_string());
+        let blocks_in_future = env::var("ANGSTROM_BLOCKS_IN_FUTURE")
+            .ok()
+            .and_then(|blocks| blocks.parse().ok())
+            .unwrap_or(ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE);
+
+        Ok(Self { client, url, key, blocks_in_future })
+    }
+
+    /// Fetches the current attestation window on a thread of its own.
+    ///
+    /// The blocking client cannot be driven from inside an async runtime, and callers of
+    /// `encode_swap` usually are.
+    fn fetch_off_runtime(&self) -> Result<AttestationResponse, EncodingError> {
+        thread::scope(|scope| {
+            scope
+                .spawn(|| self.fetch())
+                .join()
+                .map_err(|_| {
+                    EncodingError::RecoverableError(
+                        "Angstrom attestation fetch panicked".to_string(),
+                    )
+                })
+        })?
+    }
+
     fn fetch(&self) -> Result<AttestationResponse, EncodingError> {
         let response = self
             .client
@@ -175,136 +218,60 @@ impl ApiConfig {
     }
 }
 
-/// Runs [`ApiConfig::fetch`] on a thread of its own.
+/// Encodes attestations into the `hookData` layout the Uniswap V4 executor expects.
 ///
-/// The blocking client cannot be driven from inside an async runtime, and callers of
-/// `encode_swap` usually are.
-fn fetch_off_runtime(api: &ApiConfig) -> Result<AttestationResponse, EncodingError> {
-    thread::scope(|scope| {
-        scope
-            .spawn(|| api.fetch())
-            .join()
-            .map_err(|_| {
-                EncodingError::RecoverableError("Angstrom attestation fetch panicked".to_string())
-            })
-    })?
+/// Every attestation takes exactly `8 + ANGSTROM_ATTESTATION_SIZE` bytes: a big endian block
+/// number followed by the attestation itself. Entries for blocks that have already passed are
+/// harmless, since the executor selects the entry matching `block.number`.
+///
+/// Returns an error if an attestation is not `ANGSTROM_ATTESTATION_SIZE` bytes long, which the
+/// executor would reject on chain.
+fn encode_attestations(response: &AttestationResponse) -> Result<Vec<u8>, EncodingError> {
+    let mut encoded =
+        Vec::with_capacity(response.attestations.len() * (8 + ANGSTROM_ATTESTATION_SIZE));
+    for data in &response.attestations {
+        let attestation_hex = data
+            .attestation
+            .strip_prefix("0x")
+            .unwrap_or(&data.attestation);
+
+        let attestation = hex::decode(attestation_hex).map_err(|e| {
+            EncodingError::FatalError(format!(
+                "Failed to decode Angstrom attestation for block {}: {}",
+                data.block_number, e
+            ))
+        })?;
+
+        if attestation.len() != ANGSTROM_ATTESTATION_SIZE {
+            return Err(EncodingError::FatalError(format!(
+                "Angstrom attestation for block {} is {} bytes, expected {}",
+                data.block_number,
+                attestation.len(),
+                ANGSTROM_ATTESTATION_SIZE
+            )));
+        }
+
+        encoded.extend_from_slice(&data.block_number.to_be_bytes());
+        encoded.extend_from_slice(&attestation);
+    }
+
+    Ok(encoded)
 }
 
-/// An encoded attestation window and the time it was fetched.
-struct CachedWindow {
-    encoded: Vec<u8>,
-    fetched_at: Instant,
+/// Response from the Angstrom attestation API.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct AttestationResponse {
+    pub(crate) success: bool,
+    pub(crate) attestations: Vec<AttestationData>,
 }
 
-/// Process-wide cache of Angstrom attestations, kept warm by a background thread.
-pub(crate) struct AttestationCache {
-    api: Api,
-    latest: RwLock<Option<CachedWindow>>,
-}
-
-impl AttestationCache {
-    /// Returns the process-wide cache, starting its refresh thread on the first call.
-    ///
-    /// The thread is only started when the Angstrom API is configured, and then runs for the
-    /// lifetime of the process. Call this as early as possible so that the first encoded swap
-    /// already finds a warm cache.
-    pub(crate) fn global() -> &'static Arc<Self> {
-        CACHE.get_or_init(|| {
-            let cache = Arc::new(Self::new(Api::from_env()));
-            Arc::clone(&cache).spawn_refresher();
-            cache
-        })
-    }
-
-    fn new(api: Api) -> Self {
-        Self { api, latest: RwLock::new(None) }
-    }
-
-    /// Returns the attestation bytes to pass as `hookData` for a swap on an Angstrom pool.
-    ///
-    /// Served from the cache whenever the background refresh is healthy, which costs no network
-    /// access. A cold or stale cache falls back to a single blocking fetch so that encoding still
-    /// succeeds, at the cost of one API round trip.
-    ///
-    /// Returns an error if the Angstrom API is unconfigured, or if the fallback fetch fails.
-    pub(crate) fn hook_data(&self) -> Result<Vec<u8>, EncodingError> {
-        let api = match &self.api {
-            Api::Ready(api) => api,
-            Api::Unavailable(reason) => return Err(EncodingError::FatalError(reason.clone())),
-        };
-
-        if let Some(encoded) = self.fresh_window() {
-            return Ok(encoded);
-        }
-
-        warn!("Angstrom attestation cache is cold or stale, fetching while encoding");
-        let encoded = encode_attestations(&fetch_off_runtime(api)?)?;
-        self.store(encoded.clone(), Instant::now());
-        Ok(encoded)
-    }
-
-    /// Returns the cached window while it is young enough to still cover an upcoming block.
-    fn fresh_window(&self) -> Option<Vec<u8>> {
-        let latest = self
-            .latest
-            .read()
-            .unwrap_or_else(PoisonError::into_inner);
-        let window = latest.as_ref()?;
-        if window.fetched_at.elapsed() > ANGSTROM_ATTESTATION_MAX_AGE {
-            return None;
-        }
-        Some(window.encoded.clone())
-    }
-
-    fn store(&self, encoded: Vec<u8>, fetched_at: Instant) {
-        let mut latest = self
-            .latest
-            .write()
-            .unwrap_or_else(PoisonError::into_inner);
-        *latest = Some(CachedWindow { encoded, fetched_at });
-    }
-
-    /// Spawns the thread that keeps the cache warm.
-    ///
-    /// A dedicated thread is used rather than a `tokio` task so that the encoder works whether
-    /// or not its consumer runs a runtime, and because the blocking API client cannot be driven
-    /// from inside one.
-    fn spawn_refresher(self: Arc<Self>) {
-        match self.api {
-            Api::Unavailable(_) => return,
-            Api::Ready(_) => {}
-        }
-
-        let spawned = thread::Builder::new()
-            .name("angstrom-attestations".to_string())
-            .spawn(move || loop {
-                self.refresh();
-                thread::sleep(ANGSTROM_ATTESTATION_REFRESH_INTERVAL);
-            });
-
-        if let Err(e) = spawned {
-            warn!(
-                "Failed to start the Angstrom attestation refresher: {e}. Attestations will be \
-                 fetched while encoding instead."
-            );
-        }
-    }
-
-    /// Fetches the current window into the cache, keeping the previous one on failure.
-    fn refresh(&self) {
-        let api = match &self.api {
-            Api::Ready(api) => api,
-            Api::Unavailable(_) => return,
-        };
-
-        match api
-            .fetch()
-            .and_then(|response| encode_attestations(&response))
-        {
-            Ok(encoded) => self.store(encoded, Instant::now()),
-            Err(e) => warn!("Angstrom attestation refresh failed: {e}"),
-        }
-    }
+/// The attestation unlocking Angstrom's pools for one block.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct AttestationData {
+    #[serde(rename = "blockNumber")]
+    pub(crate) block_number: u64,
+    #[serde(rename = "unlockData")]
+    pub(crate) attestation: String,
 }
 
 #[cfg(test)]
@@ -330,8 +297,52 @@ mod tests {
         }
     }
 
-    fn disabled_cache() -> AttestationCache {
-        AttestationCache::new(Api::Unavailable("no API key".to_string()))
+    /// A cache with no API configured, so that any fetch fails with a known message instead of
+    /// reaching the network.
+    fn unconfigured_cache(window: Option<CachedWindow>) -> AttestationCache {
+        AttestationCache { api: Err("no API key".to_string()), latest: RwLock::new(window) }
+    }
+
+    fn window_fetched_ago(age: Duration) -> Option<CachedWindow> {
+        let fetched_at = Instant::now()
+            .checked_sub(age)
+            .expect("the monotonic clock is past the requested age");
+        Some(CachedWindow { encoded: vec![1, 2, 3], fetched_at })
+    }
+
+    #[test]
+    fn test_fresh_window_is_served_without_the_api() {
+        let cache = unconfigured_cache(window_fetched_ago(Duration::ZERO));
+
+        assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_stale_window_triggers_a_fetch() {
+        let stale = ANGSTROM_ATTESTATION_MAX_AGE + Duration::from_secs(1);
+        let cache = unconfigured_cache(window_fetched_ago(stale));
+
+        let err = cache.hook_data().unwrap_err();
+
+        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
+    }
+
+    #[test]
+    fn test_cold_cache_triggers_a_fetch() {
+        let err = unconfigured_cache(None)
+            .hook_data()
+            .unwrap_err();
+
+        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
+    }
+
+    #[test]
+    fn test_failed_refresh_keeps_the_previous_window() {
+        let cache = unconfigured_cache(window_fetched_ago(Duration::ZERO));
+
+        cache.refresh().unwrap_err();
+
+        assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
     }
 
     #[test]
@@ -358,6 +369,7 @@ mod tests {
     #[test]
     fn test_encode_attestations_empty_window() {
         let empty = AttestationResponse { success: true, attestations: vec![] };
+
         assert!(encode_attestations(&empty)
             .unwrap()
             .is_empty());
@@ -374,6 +386,7 @@ mod tests {
         };
 
         let err = encode_attestations(&response).unwrap_err();
+
         assert!(format!("{err}").contains("is 4 bytes, expected 85"));
     }
 
@@ -388,47 +401,7 @@ mod tests {
         };
 
         let err = encode_attestations(&response).unwrap_err();
+
         assert!(format!("{err}").contains("Failed to decode Angstrom attestation for block"));
-    }
-
-    #[test]
-    fn test_fresh_window_is_served_from_cache() {
-        let cache = disabled_cache();
-        cache.store(vec![1, 2, 3], Instant::now());
-
-        assert_eq!(cache.fresh_window(), Some(vec![1, 2, 3]));
-    }
-
-    #[test]
-    fn test_stale_window_is_not_served_from_cache() {
-        let cache = disabled_cache();
-        let stale = Instant::now()
-            .checked_sub(ANGSTROM_ATTESTATION_MAX_AGE + Duration::from_secs(1))
-            .expect("the monotonic clock is past the maximum attestation age");
-        cache.store(vec![1, 2, 3], stale);
-
-        assert_eq!(cache.fresh_window(), None);
-    }
-
-    #[test]
-    fn test_cold_cache_is_not_served() {
-        assert_eq!(disabled_cache().fresh_window(), None);
-    }
-
-    #[test]
-    fn test_hook_data_without_api_key_errors() {
-        let err = disabled_cache()
-            .hook_data()
-            .unwrap_err();
-        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
-    }
-
-    #[test]
-    fn test_refresh_keeps_the_previous_window_when_unavailable() {
-        let cache = disabled_cache();
-        cache.store(vec![1, 2, 3], Instant::now());
-        cache.refresh();
-
-        assert_eq!(cache.fresh_window(), Some(vec![1, 2, 3]));
     }
 }
