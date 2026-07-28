@@ -58,17 +58,25 @@ pub(crate) const ANGSTROM_DEFAULT_API_URL: &str =
 /// `8 + ANGSTROM_ATTESTATION_SIZE` byte entries.
 pub(crate) const ANGSTROM_ATTESTATION_SIZE: usize = 85;
 
-/// How long the background prefetcher waits between Angstrom attestation refreshes.
+/// The shortest time Ethereum can take to produce a block, which both the refresh interval and
+/// the maximum window age derive from.
 ///
-/// Shorter than a block, so that every block is encoded against a window fetched during the
-/// current or previous block.
-pub(crate) const ANGSTROM_ATTESTATION_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
+/// Ethereum proposes at most one block every 12 seconds, and a skipped proposal only makes the
+/// gap longer. Treating 12 seconds as one block therefore always overestimates how many blocks
+/// have elapsed, which is the safe direction for both constants below.
+const ETHEREUM_MIN_BLOCK_TIME_SECS: u64 = 12;
 
-/// Ethereum's slot time, used to express the attestation window's block span as an age.
+/// How many times per block the background prefetcher refreshes the attestation window.
 ///
-/// Slots are fixed at 12 seconds and can only be missed, never shortened, so treating every
-/// 12 seconds as a block always overestimates how many blocks have elapsed.
-const ETHEREUM_SLOT_SECS: u64 = 12;
+/// The window's contents only change when a block is produced, so refreshing more than once per
+/// block fetches nothing new. It is still more than once because the refresher has no block feed
+/// to align to: sampling twice a block bounds how long it keeps serving the previous block's
+/// window after a new one becomes available, without polling the API for the sake of it.
+const ANGSTROM_ATTESTATION_REFRESHES_PER_BLOCK: u64 = 2;
+
+/// How long the background prefetcher waits between Angstrom attestation refreshes.
+pub(crate) const ANGSTROM_ATTESTATION_REFRESH_INTERVAL: Duration =
+    Duration::from_secs(ETHEREUM_MIN_BLOCK_TIME_SECS / ANGSTROM_ATTESTATION_REFRESHES_PER_BLOCK);
 
 /// How many of the fetched window's blocks may elapse before the cache refetches while encoding.
 ///
@@ -84,7 +92,7 @@ const ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS: u64 = 1;
 /// Only reached when the background refresh has stopped keeping up: a healthy refresher replaces
 /// the window every `ANGSTROM_ATTESTATION_REFRESH_INTERVAL`.
 pub(crate) const ANGSTROM_ATTESTATION_MAX_AGE: Duration =
-    Duration::from_secs(ETHEREUM_SLOT_SECS * ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS);
+    Duration::from_secs(ETHEREUM_MIN_BLOCK_TIME_SECS * ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS);
 
 /// How long a single request to the Angstrom API may take before it is aborted.
 pub(crate) const ANGSTROM_API_TIMEOUT: Duration = Duration::from_secs(2);
