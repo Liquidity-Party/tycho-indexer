@@ -72,11 +72,12 @@ const ETHEREUM_SLOT_SECS: u64 = 12;
 
 /// How many of the fetched window's blocks may elapse before the cache refetches while encoding.
 ///
-/// A window fetched during block `N` covers `N` through `N + ANGSTROM_BLOCKS_IN_FUTURE`, so this
-/// spends part of that span and leaves the rest for the transaction to land in. At the default of
-/// 5 blocks in the future, 2 blocks of age leaves 3 covered blocks. Raising it past half the
-/// window leaves too little runway; the transaction would land after the last attested block.
-const ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS: u64 = 2;
+/// A window fetched during block `N` covers `N` through `N + ANGSTROM_BLOCKS_IN_FUTURE`. Every
+/// block that elapses before encoding spends one of those: it removes a block the transaction
+/// could still have landed in, and adds an attestation the executor will skip. Keeping this at a
+/// single block preserves all but one block of the caller's slack, at the price of refetching
+/// inline sooner when the background refresh stalls.
+const ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS: u64 = 1;
 
 /// How old a cached Angstrom attestation window may be before it is refetched while encoding.
 ///
