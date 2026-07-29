@@ -1,3 +1,84 @@
+## [0.341.10](https://github.com/propeller-heads/tycho/compare/0.341.9...0.341.10) (2026-07-29)
+
+
+### Bug Fixes
+
+* **simulation:** refresh both balance maps in VM update_pool_state ([39a2f82](https://github.com/propeller-heads/tycho/commit/39a2f82983e600c375ba376fd3cdb5ba0c920248))
+* **simulation:** refresh both VM balance maps and make the price-query caller configurable ([#1234](https://github.com/propeller-heads/tycho/issues/1234)) ([e241055](https://github.com/propeller-heads/tycho/commit/e241055b8fec276579a79fb3891c214e9cf7500b))
+* **simulation:** use zero tx.origin for Balancer V3 price queries ([de68cc2](https://github.com/propeller-heads/tycho/commit/de68cc2e4bc9c155f3b2f30f17264abb53b320b1))
+
+## [0.341.9](https://github.com/propeller-heads/tycho/compare/0.341.8...0.341.9) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([4b8941b](https://github.com/propeller-heads/tycho/commit/4b8941b0675091a83d840ed57a0987725332ee04))
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([#1229](https://github.com/propeller-heads/tycho/issues/1229)) ([8e71e9e](https://github.com/propeller-heads/tycho/commit/8e71e9eb7c12d11c8fb7b0afcd5bfb84c40a50aa))
+
+## [0.341.8](https://github.com/propeller-heads/tycho/compare/0.341.7...0.341.8) (2026-07-28)
+
+
+### Bug Fixes
+
+* **fermiswap:** handle engine quote refusals in adapter ([#1238](https://github.com/propeller-heads/tycho/issues/1238)) ([f935047](https://github.com/propeller-heads/tycho/commit/f93504781773859ed344479e054ab5c0f2e1657c))
+
+## [0.341.7](https://github.com/propeller-heads/tycho/compare/0.341.6...0.341.7) (2026-07-27)
+
+
+### Bug Fixes
+
+* **slipstreams:** default fee when dynamic-fee module marker absent ([a5c0e4a](https://github.com/propeller-heads/tycho/commit/a5c0e4ab10b2839f26155de7c3de110dc33f6036))
+* **slipstreams:** default fee when dynamic-fee module marker absent ([#1239](https://github.com/propeller-heads/tycho/issues/1239)) ([a06afc7](https://github.com/propeller-heads/tycho/commit/a06afc734d58679f2f2fa884f3671754da7bdc82))
+* **slipstreams:** treat a failed observation as zero dynamic fee ([f6391ea](https://github.com/propeller-heads/tycho/commit/f6391eab497f60f340c2c06d92d983a762eca66a))
+
+## [0.341.6](https://github.com/propeller-heads/tycho/compare/0.341.5...0.341.6) (2026-07-27)
+
+
+### Bug Fixes
+
+* support slipstreams initial fees in simulation ([8f4dcca](https://github.com/propeller-heads/tycho/commit/8f4dcca5daf6976ea4192e9e343fcbee379dacc4))
+* support Slipstreams initial fees in simulation ([#1196](https://github.com/propeller-heads/tycho/issues/1196)) ([49ba1c4](https://github.com/propeller-heads/tycho/commit/49ba1c486b0652bdfa9b72831c11e664adfa8d2b))
+
+## [0.341.5](https://github.com/propeller-heads/tycho/compare/0.341.4...0.341.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* preserve block history across reinit for flashblock reverts ([f1d7cee](https://github.com/propeller-heads/tycho/commit/f1d7cee3d0bf59e7e5541810f401195363dca6e3))
+* preserve block history across reinit for flashblock reverts ([#1224](https://github.com/propeller-heads/tycho/issues/1224)) ([86821a8](https://github.com/propeller-heads/tycho/commit/86821a868b2356ec9b08fed00ae1e08bbc964f9a))
+
+## [0.341.4](https://github.com/propeller-heads/tycho/compare/0.341.3...0.341.4) (2026-07-24)
+
+
+### Bug Fixes
+
+* **fermiswap:** follow engine migration to 0x90f73fEA ([#1228](https://github.com/propeller-heads/tycho/issues/1228)) ([9606fc1](https://github.com/propeller-heads/tycho/commit/9606fc12a50b1d81d85365f9ac40737c2d369ffc))
+
+## [0.341.3](https://github.com/propeller-heads/tycho/compare/0.341.2...0.341.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* **adapter-integration:** align curve manifest capabilities with contract ([#1227](https://github.com/propeller-heads/tycho/issues/1227)) ([7e2b05d](https://github.com/propeller-heads/tycho/commit/7e2b05d8af02cbe2ae809c635f9dec05407eaac3))
+
+## [0.341.2](https://github.com/propeller-heads/tycho/compare/0.341.1...0.341.2) (2026-07-24)
+
+
+### Bug Fixes
+
+* **substreams:** pin tycho-substreams 0.8.1 across integrations ([b96762a](https://github.com/propeller-heads/tycho/commit/b96762ac31f8c08d6ee2b1d8d6c70b4e1ddac9c4)), closes [#1056](https://github.com/propeller-heads/tycho/issues/1056)
+* **substreams:** pin tycho-substreams 0.8.1 across integrations ([#1198](https://github.com/propeller-heads/tycho/issues/1198)) ([8c5caa1](https://github.com/propeller-heads/tycho/commit/8c5caa18f76341c31aa15c884f493dedc26daa8a))
+* **substreams:** remove dead SerializableVecBigInt trait ([2521479](https://github.com/propeller-heads/tycho/commit/2521479ba8f19dc2f2487429358a89a5b94e642f))
+
+## [0.341.1](https://github.com/propeller-heads/tycho/compare/0.341.0...0.341.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* guard NG curve solvers against out-of-domain balances ([938fe8e](https://github.com/propeller-heads/tycho/commit/938fe8e3b223e31c6da1294e73d2fa7314d8abe5))
+* guard NG curve solvers against out-of-domain balances ([#1231](https://github.com/propeller-heads/tycho/issues/1231)) ([8778f9e](https://github.com/propeller-heads/tycho/commit/8778f9e0dfe4d1ff01c41aab6e71c45620b0eeb5))
+* reject out-of-range coin indices in NG curve math ([669af6d](https://github.com/propeller-heads/tycho/commit/669af6d06bd984603c8ebbadcc959aac9a7d0fe3))
+
 ## [0.341.0](https://github.com/propeller-heads/tycho/compare/0.340.0...0.341.0) (2026-07-22)
 
 
