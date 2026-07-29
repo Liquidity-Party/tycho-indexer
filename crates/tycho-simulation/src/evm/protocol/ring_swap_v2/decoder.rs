@@ -20,7 +20,7 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RingSwapV2State {
     async fn try_from_with_header(
         snapshot: ComponentWithState,
         _block: BlockHeader,
-        account_balances: &HashMap<Bytes, HashMap<Bytes, Bytes>>,
+        _account_balances: &HashMap<Bytes, HashMap<Bytes, Bytes>>,
         _all_tokens: &HashMap<Bytes, Token>,
         _decoder_context: &DecoderContext,
     ) -> Result<Self, Self::Error> {
@@ -34,8 +34,6 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RingSwapV2State {
             )));
         }
 
-        let fw_token0 = static_attribute(&snapshot, "fw_token0")?;
-        let fw_token1 = static_attribute(&snapshot, "fw_token1")?;
         let underlying_token0 = static_attribute(&snapshot, "underlying_token0")?;
         let underlying_token1 = static_attribute(&snapshot, "underlying_token1")?;
         let reserves_inverted = static_attribute(&snapshot, "reserves_inverted")?
@@ -44,12 +42,11 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RingSwapV2State {
             .unwrap_or_default() ==
             1;
 
-        let (fw_component0, fw_component1, expected_component0, expected_component1) =
-            if reserves_inverted {
-                (fw_token1, fw_token0, underlying_token1, underlying_token0)
-            } else {
-                (fw_token0, fw_token1, underlying_token0, underlying_token1)
-            };
+        let (expected_component0, expected_component1) = if reserves_inverted {
+            (underlying_token1, underlying_token0)
+        } else {
+            (underlying_token0, underlying_token1)
+        };
 
         if component_tokens[0] != expected_component0 || component_tokens[1] != expected_component1
         {
@@ -59,18 +56,17 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RingSwapV2State {
             )));
         }
 
-        let backing0 = backing_balance(account_balances, &fw_component0, &component_tokens[0])?;
-        let backing1 = backing_balance(account_balances, &fw_component1, &component_tokens[1])?;
+        let backing0 = component_balance(&snapshot, &component_tokens[0])?;
+        let backing1 = component_balance(&snapshot, &component_tokens[1])?;
 
         Ok(RingSwapV2State::new(
+            snapshot.component.id,
             reserve0,
             reserve1,
             backing0,
             backing1,
             component_tokens[0].clone(),
             component_tokens[1].clone(),
-            fw_component0,
-            fw_component1,
         ))
     }
 }
@@ -87,18 +83,19 @@ fn static_attribute(
         .ok_or_else(|| InvalidSnapshotError::MissingAttribute(name.to_string()))
 }
 
-fn backing_balance(
-    account_balances: &HashMap<Bytes, HashMap<Bytes, Bytes>>,
-    wrapper: &Bytes,
-    underlying: &Bytes,
+fn component_balance(
+    snapshot: &ComponentWithState,
+    token: &Bytes,
 ) -> Result<U256, InvalidSnapshotError> {
-    account_balances
-        .get(wrapper)
-        .and_then(|balances| balances.get(underlying))
+    snapshot
+        .state
+        .balances
+        .get(token)
         .map(|balance| U256::from_be_slice(balance))
         .ok_or_else(|| {
             InvalidSnapshotError::ValueError(format!(
-                "Missing FewToken backing balance for wrapper {wrapper:?} and underlying {underlying:?}"
+                "Missing RingSwapV2 component balance for component {} and token {token:?}",
+                snapshot.component.id
             ))
         })
 }
@@ -132,8 +129,8 @@ mod tests {
                     ("reserve1".to_string(), Bytes::from(vec![20])),
                 ]),
                 balances: HashMap::from([
-                    (token0.clone(), Bytes::from(vec![70])),
-                    (token1.clone(), Bytes::from(vec![80])),
+                    (token0.clone(), Bytes::from(vec![7])),
+                    (token1.clone(), Bytes::from(vec![8])),
                 ]),
             },
             component: ProtocolComponent {
@@ -154,24 +151,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn decodes_component_ordered_wrapper_backing() {
-        let balances = HashMap::from([
-            (address(3), HashMap::from([(address(1), Bytes::from(vec![7]))])),
-            (address(4), HashMap::from([(address(2), Bytes::from(vec![8]))])),
-        ]);
-
+    async fn decodes_component_balances_as_available_backing() {
         let state = RingSwapV2State::try_from_with_header(
             snapshot(),
             BlockHeader::default(),
-            &balances,
+            &HashMap::new(),
             &HashMap::new(),
             &Default::default(),
         )
         .await
         .unwrap();
 
-        assert_eq!(state.fw_token0, address(3));
-        assert_eq!(state.fw_token1, address(4));
+        assert_eq!(state.component_id, "ring");
         assert_eq!(state.backing0, U256::from(7));
         assert_eq!(state.backing1, U256::from(8));
     }
@@ -188,31 +179,30 @@ mod tests {
             ("underlying_token1".to_string(), address(1)),
             ("reserves_inverted".to_string(), Bytes::from(vec![1])),
         ]);
-        let balances = HashMap::from([
-            (address(3), HashMap::from([(address(2), Bytes::from(vec![8]))])),
-            (address(4), HashMap::from([(address(1), Bytes::from(vec![7]))])),
-        ]);
 
         let state = RingSwapV2State::try_from_with_header(
             inverted_snapshot,
             BlockHeader::default(),
-            &balances,
+            &HashMap::new(),
             &HashMap::new(),
             &Default::default(),
         )
         .await
         .unwrap();
 
-        assert_eq!(state.fw_token0, address(4));
-        assert_eq!(state.fw_token1, address(3));
         assert_eq!(state.backing0, U256::from(7));
         assert_eq!(state.backing1, U256::from(8));
     }
 
     #[tokio::test]
-    async fn rejects_snapshot_without_wrapper_backing() {
+    async fn rejects_snapshot_without_component_balance() {
+        let mut missing_balance = snapshot();
+        missing_balance
+            .state
+            .balances
+            .remove(&address(2));
         let result = RingSwapV2State::try_from_with_header(
-            snapshot(),
+            missing_balance,
             BlockHeader::default(),
             &HashMap::new(),
             &HashMap::new(),

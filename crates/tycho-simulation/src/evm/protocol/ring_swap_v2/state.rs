@@ -35,33 +35,31 @@ const FEE_PRECISION: U256 = U256::from_limbs([10_000, 0, 0, 0]);
 const FEE_NUMERATOR: U256 = U256::from_limbs([9_970, 0, 0, 0]);
 
 /// Ring Swap v2 uses normal CPMM reserve math, but its output FewToken must be unwrapped into
-/// the solver-facing ERC-20. `backing{0,1}` is the matching underlying balance held by each
-/// wrapper and caps executable output independently from the pair's FewToken reserves.
+/// the solver-facing ERC-20. `backing{0,1}` is the indexed component balance
+/// `min(pair reserve, wrapper backing)`. Since CPMM output is always below the output reserve,
+/// this value is equivalent to the wrapper backing when enforcing executable output.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RingSwapV2State {
+    pub component_id: String,
     pub reserve0: U256,
     pub reserve1: U256,
     pub backing0: U256,
     pub backing1: U256,
     pub token0: Bytes,
     pub token1: Bytes,
-    pub fw_token0: Bytes,
-    pub fw_token1: Bytes,
 }
 
 impl RingSwapV2State {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        component_id: String,
         reserve0: U256,
         reserve1: U256,
         backing0: U256,
         backing1: U256,
         token0: Bytes,
         token1: Bytes,
-        fw_token0: Bytes,
-        fw_token1: Bytes,
     ) -> Self {
-        Self { reserve0, reserve1, backing0, backing1, token0, token1, fw_token0, fw_token1 }
+        Self { component_id, reserve0, reserve1, backing0, backing1, token0, token1 }
     }
 
     fn zero_to_one(&self, token_in: &Token, token_out: &Token) -> bool {
@@ -143,19 +141,17 @@ impl RingSwapV2State {
         Ok((u256_to_biguint(capped_input), u256_to_biguint(output)))
     }
 
-    fn apply_backing_updates(&mut self, balances: &Balances) {
-        if let Some(balance) = balances
-            .account_balances
-            .get(&self.fw_token0)
-            .and_then(|balances| balances.get(&self.token0))
-        {
+    fn apply_component_balance_updates(&mut self, balances: &Balances) {
+        let Some(component_balances) = balances
+            .component_balances
+            .get(&self.component_id)
+        else {
+            return;
+        };
+        if let Some(balance) = component_balances.get(&self.token0) {
             self.backing0 = U256::from_be_slice(balance);
         }
-        if let Some(balance) = balances
-            .account_balances
-            .get(&self.fw_token1)
-            .and_then(|balances| balances.get(&self.token1))
-        {
+        if let Some(balance) = component_balances.get(&self.token1) {
             self.backing1 = U256::from_be_slice(balance);
         }
     }
@@ -249,7 +245,7 @@ impl ProtocolSim for RingSwapV2State {
                     .ok_or_else(|| TransitionError::MissingAttribute("reserve1".to_string()))?,
             );
         }
-        self.apply_backing_updates(balances);
+        self.apply_component_balance_updates(balances);
         Ok(())
     }
 
@@ -341,17 +337,20 @@ mod tests {
         Token::new(&address(value), "T", 18, 0, &[Some(10_000)], Chain::Ethereum, 100)
     }
 
-    fn state(backing1: u64) -> RingSwapV2State {
+    fn state_with_id(component_id: &str, backing1: u64) -> RingSwapV2State {
         RingSwapV2State::new(
+            component_id.to_string(),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(1_000),
             U256::from(backing1),
             address(1),
             address(2),
-            address(3),
-            address(4),
         )
+    }
+
+    fn state(backing1: u64) -> RingSwapV2State {
+        state_with_id("ring-pool", backing1)
     }
 
     #[test]
@@ -452,6 +451,15 @@ mod tests {
             RingSwapV2State::max_input_for_backing(
                 U256::from(1_000),
                 U256::from(1_000),
+                U256::from(1_000),
+            )
+            .unwrap(),
+            U256::MAX
+        );
+        assert_eq!(
+            RingSwapV2State::max_input_for_backing(
+                U256::from(1_000),
+                U256::from(1_000),
                 U256::MAX,
             )
             .unwrap(),
@@ -477,14 +485,14 @@ mod tests {
     }
 
     #[test]
-    fn account_backing_only_delta_updates_without_reserve_attributes() {
+    fn component_balance_only_delta_updates_without_reserve_attributes() {
         let mut state = state(10);
         let balances = Balances {
-            component_balances: HashMap::new(),
-            account_balances: HashMap::from([(
-                address(4),
+            component_balances: HashMap::from([(
+                "ring-pool".to_string(),
                 HashMap::from([(address(2), Bytes::from(vec![42]))]),
             )]),
+            account_balances: HashMap::new(),
         };
 
         state
@@ -497,15 +505,15 @@ mod tests {
     }
 
     #[test]
-    fn shared_wrapper_backing_update_applies_to_each_pool_state() {
-        let mut first_pool = state(10);
-        let mut second_pool = state(20);
+    fn shared_wrapper_updates_each_pool_from_its_component_balance() {
+        let mut first_pool = state_with_id("first-pool", 10);
+        let mut second_pool = state_with_id("second-pool", 20);
         let balances = Balances {
-            component_balances: HashMap::new(),
-            account_balances: HashMap::from([(
-                address(4),
-                HashMap::from([(address(2), Bytes::from(vec![42]))]),
-            )]),
+            component_balances: HashMap::from([
+                ("first-pool".to_string(), HashMap::from([(address(2), Bytes::from(vec![42]))])),
+                ("second-pool".to_string(), HashMap::from([(address(2), Bytes::from(vec![21]))])),
+            ]),
+            account_balances: HashMap::new(),
         };
 
         first_pool
@@ -516,15 +524,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(first_pool.backing1, U256::from(42));
-        assert_eq!(second_pool.backing1, U256::from(42));
+        assert_eq!(second_pool.backing1, U256::from(21));
     }
 
     #[test]
-    fn component_tvl_balances_do_not_override_wrapper_backing() {
+    fn unrelated_component_balance_does_not_update_state() {
         let mut state = state(10);
         let balances = Balances {
             component_balances: HashMap::from([(
-                "ring-pool".to_string(),
+                "other-pool".to_string(),
                 HashMap::from([(address(2), Bytes::from(vec![99]))]),
             )]),
             account_balances: HashMap::new(),

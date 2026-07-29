@@ -1,9 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 use substreams::{
-    key,
-    pb::substreams::StoreDeltas,
     prelude::BigInt,
     store::{StoreGet, StoreGetBigInt, StoreGetProto, StoreGetString},
 };
@@ -12,7 +10,7 @@ use substreams_helper::{event_handler::EventHandler, hex::Hexable};
 
 use super::store_pool_reserves::exposed_reserves;
 use crate::{abi::pool::events::Sync, store_key::StoreKey, traits::PoolAddresser};
-use tycho_substreams::{balances::aggregate_balances_changes, prelude::*};
+use tycho_substreams::prelude::*;
 
 struct TimedBalanceChange {
     ord: u64,
@@ -28,7 +26,6 @@ pub fn map_pool_events(
     pools_store: StoreGetProto<ProtocolComponent>,
     pool_reserve_store: StoreGetBigInt,
     wrapper_backing_deltas: BlockBalanceDeltas,
-    wrapper_backing_store_deltas: StoreDeltas,
     wrapper_backing_store: StoreGetBigInt,
     token_pools_store: StoreGetString,
 ) -> Result<BlockChanges, substreams::errors::Error> {
@@ -54,11 +51,6 @@ pub fn map_pool_events(
         &mut timed_balance_changes,
     );
     apply_timed_balance_changes(timed_balance_changes, &mut tx_changes);
-    add_wrapper_account_changes(
-        wrapper_backing_store_deltas,
-        wrapper_backing_deltas,
-        &mut tx_changes,
-    );
 
     Ok(BlockChanges {
         block: Some((&block).into()),
@@ -263,44 +255,6 @@ fn pool_reserve_key(component_id: &str, token: &[u8]) -> String {
     StoreKey::PoolReserve.get_unique_key(&format!("{}:{}", component_id, hex::encode(token)))
 }
 
-fn add_wrapper_account_changes(
-    wrapper_backing_store_deltas: StoreDeltas,
-    wrapper_backing_deltas: BlockBalanceDeltas,
-    tx_changes: &mut HashMap<u64, TransactionChangesBuilder>,
-) {
-    let created_wrappers = created_wrapper_ids(&wrapper_backing_store_deltas);
-    for (_, (transaction, wrapper_balances)) in
-        aggregate_balances_changes(wrapper_backing_store_deltas, wrapper_backing_deltas)
-    {
-        let builder = tx_changes
-            .entry(transaction.index)
-            .or_insert_with(|| TransactionChangesBuilder::new(&transaction));
-
-        for (wrapper_id, token_balances) in wrapper_balances {
-            let wrapper_id = String::from_utf8(wrapper_id)
-                .expect("FewToken wrapper balance delta is not valid UTF-8");
-            let wrapper = hex::decode(&wrapper_id)
-                .expect("FewToken wrapper balance delta has an invalid wrapper address");
-            let mut contract_change =
-                InterimContractChange::new(&wrapper, created_wrappers.contains(&wrapper_id));
-            for balance_change in token_balances.values() {
-                contract_change
-                    .upsert_token_balance(&balance_change.token, &balance_change.balance);
-            }
-            builder.add_contract_changes(&contract_change);
-        }
-    }
-}
-
-fn created_wrapper_ids(wrapper_backing_store_deltas: &StoreDeltas) -> HashSet<String> {
-    wrapper_backing_store_deltas
-        .deltas
-        .iter()
-        .filter(|delta| delta.old_value.is_empty())
-        .map(|delta| key::segment_at(&delta.key, 0).to_string())
-        .collect()
-}
-
 fn merge_created_pools(
     block_entity_changes: BlockChanges,
     tx_changes: &mut HashMap<u64, TransactionChangesBuilder>,
@@ -471,27 +425,5 @@ mod tests {
 
         assert_eq!(component_wrapper(&pool, &[1; 20]), Some([4; 20].as_slice()));
         assert_eq!(component_wrapper(&pool, &[2; 20]), Some([3; 20].as_slice()));
-    }
-
-    #[test]
-    fn first_backing_delta_creates_the_wrapper_account() {
-        let deltas = StoreDeltas {
-            deltas: vec![
-                substreams::pb::substreams::StoreDelta {
-                    key: "wrapper:token".to_string(),
-                    ..Default::default()
-                },
-                substreams::pb::substreams::StoreDelta {
-                    key: "existing:token".to_string(),
-                    old_value: b"1".to_vec(),
-                    new_value: b"2".to_vec(),
-                    ..Default::default()
-                },
-            ],
-        };
-
-        let created = created_wrapper_ids(&deltas);
-
-        assert_eq!(created, HashSet::from(["wrapper".to_string()]));
     }
 }

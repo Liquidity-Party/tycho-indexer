@@ -90,8 +90,6 @@ modules:
         mode: get
       - map: map_wrapper_backing_deltas
       - store: store_wrapper_backings
-        mode: deltas
-      - store: store_wrapper_backings
         mode: get
       - store: store_token_pools
         mode: get
