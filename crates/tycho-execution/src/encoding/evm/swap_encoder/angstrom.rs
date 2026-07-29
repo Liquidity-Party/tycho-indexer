@@ -225,9 +225,16 @@ impl ApiConfig {
 /// number followed by the attestation itself. Entries for blocks that have already passed are
 /// harmless, since the executor selects the entry matching `block.number`.
 ///
-/// Returns an error if an attestation is not `ANGSTROM_ATTESTATION_SIZE` bytes long, which the
+/// Returns an error if the window is empty, since encoding it would produce a swap whose pool
+/// stays locked, or if an attestation is not `ANGSTROM_ATTESTATION_SIZE` bytes long, which the
 /// executor would reject on chain.
 fn encode_attestations(response: &AttestationResponse) -> Result<Vec<u8>, EncodingError> {
+    if response.attestations.is_empty() {
+        return Err(EncodingError::RecoverableError(
+            "Angstrom API returned an empty attestation window".to_string(),
+        ));
+    }
+
     let mut encoded =
         Vec::with_capacity(response.attestations.len() * (8 + ANGSTROM_ATTESTATION_SIZE));
     for data in &response.attestations {
@@ -435,12 +442,17 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_attestations_empty_window() {
+    fn test_encode_attestations_rejects_empty_window() {
         let empty = AttestationResponse { success: true, attestations: vec![] };
 
-        assert!(encode_attestations(&empty)
-            .unwrap()
-            .is_empty());
+        let err = encode_attestations(&empty).unwrap_err();
+
+        assert_eq!(
+            err,
+            EncodingError::RecoverableError(
+                "Angstrom API returned an empty attestation window".to_string()
+            )
+        );
     }
 
     #[test]
