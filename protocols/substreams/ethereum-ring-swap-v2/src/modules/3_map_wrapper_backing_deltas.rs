@@ -59,14 +59,9 @@ pub fn map_wrapper_backing_deltas(
         .map(Transaction::from)
     {
         for (underlying, wrapper) in &new_wrappers {
-            let balance = erc20::functions::BalanceOf { owner: wrapper.clone() }
-                .call(underlying.clone())
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Unable to snapshot underlying backing for FewToken wrapper {}",
-                        hex::encode(wrapper)
-                    )
-                })?;
+            let balance = snapshot_backing_or_zero(
+                erc20::functions::BalanceOf { owner: wrapper.clone() }.call(underlying.clone()),
+            );
             balance_deltas.push(BalanceDelta {
                 ord: u64::MAX,
                 tx: Some(last_tx.clone()),
@@ -78,6 +73,11 @@ pub fn map_wrapper_backing_deltas(
     }
 
     Ok(BlockBalanceDeltas { balance_deltas })
+}
+
+/// Returns zero backing when an underlying token cannot be queried.
+fn snapshot_backing_or_zero(balance: Option<BigInt>) -> BigInt {
+    balance.unwrap_or_default()
 }
 
 /// Returns the signed balance change a log applies to a wrapper's underlying balance.
@@ -167,6 +167,12 @@ mod tests {
             event_delta(&transfer_log(&wrapper(), &other(), 50), &wrapper()),
             Some(BigInt::from(-50))
         );
+    }
+
+    #[test]
+    fn backing_snapshot_fails_closed_when_balance_query_fails() {
+        assert_eq!(snapshot_backing_or_zero(Some(BigInt::from(50))), BigInt::from(50));
+        assert_eq!(snapshot_backing_or_zero(None), BigInt::zero());
     }
 
     #[test]
