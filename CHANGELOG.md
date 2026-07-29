@@ -1,3 +1,11 @@
+## [0.341.9](https://github.com/propeller-heads/tycho/compare/0.341.8...0.341.9) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([4b8941b](https://github.com/propeller-heads/tycho/commit/4b8941b0675091a83d840ed57a0987725332ee04))
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([#1229](https://github.com/propeller-heads/tycho/issues/1229)) ([8e71e9e](https://github.com/propeller-heads/tycho/commit/8e71e9eb7c12d11c8fb7b0afcd5bfb84c40a50aa))
+
 ## [0.341.8](https://github.com/propeller-heads/tycho/compare/0.341.7...0.341.8) (2026-07-28)
 
 
