@@ -1,3 +1,11 @@
+## [0.341.11](https://github.com/propeller-heads/tycho/compare/0.341.10...0.341.11) (2026-07-29)
+
+
+### Bug Fixes
+
+* **indexer:** apply pending account balances in PendingDeltas snapshots ([4b1babf](https://github.com/propeller-heads/tycho/commit/4b1babfd5de0b27707b60638e4ecc7dee9ec16c4)), closes [#1230](https://github.com/propeller-heads/tycho/issues/1230)
+* **indexer:** apply pending account balances in PendingDeltas snapshots ([#1232](https://github.com/propeller-heads/tycho/issues/1232)) ([eb51448](https://github.com/propeller-heads/tycho/commit/eb51448de0c74a14b87617636f31d9148cb60c0d))
+
 ## [0.341.10](https://github.com/propeller-heads/tycho/compare/0.341.9...0.341.10) (2026-07-29)
 
 
