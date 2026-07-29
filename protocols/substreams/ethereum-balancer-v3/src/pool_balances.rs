@@ -6,7 +6,7 @@ use keccak_hash::keccak;
 use std::collections::HashMap;
 use substreams::{
     scalar::BigInt,
-    store::{StoreGet, StoreGetInt64, StoreGetProto},
+    store::{StoreGet, StoreGetProto},
 };
 use substreams_ethereum::{
     pb::eth::{self, v2::StorageChange},
@@ -19,7 +19,7 @@ use tycho_substreams::prelude::*;
 // internal _poolTokenBalances;
 const POOL_TOKEN_BALANCES_SLOT: u8 = 5;
 
-type BalanceDeltaKey = (u64, Vec<u8>, Vec<u8>);
+type BalanceKey = (Vec<u8>, Vec<u8>);
 type CandidateComponents = HashMap<u64, HashMap<Vec<u8>, CandidateComponent>>;
 
 struct CandidateComponent {
@@ -27,64 +27,53 @@ struct CandidateComponent {
     component: ProtocolComponent,
 }
 
-struct PoolBalanceStorageDelta {
-    tx_index: u64,
-    tx: Transaction,
-    first_ordinal: u64,
-    ordinal: u64,
-    component_id: Vec<u8>,
-    token: Vec<u8>,
-    old_raw: BigInt,
-    new_raw: BigInt,
-}
-
-pub(crate) fn pool_balance_seed_deltas(
+/// Extracts absolute pool token balances from Vault `_poolTokenBalances` storage writes.
+///
+/// Returns one entry per transaction that wrote the balance of a tracked pool, carrying
+/// the final raw balance of each written (component, token) pair as an absolute
+/// `BalanceChange`. Storage holds the post-write balance, so no delta accounting is
+/// needed and a missed write is corrected by the next observed one.
+pub(crate) fn absolute_pool_balances(
     block: &eth::v2::Block,
     store: &StoreGetProto<ProtocolComponent>,
     vault_address: &[u8],
-) -> Vec<BalanceDelta> {
+) -> Vec<(Transaction, Vec<BalanceChange>)> {
     let candidates = collect_pool_balance_candidates(block, store, vault_address);
-    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates, vault_address);
-    get_pool_balance_seed_deltas(&storage_deltas)
-}
 
-fn get_pool_balance_seed_deltas(storage_deltas: &[PoolBalanceStorageDelta]) -> Vec<BalanceDelta> {
-    let mut seed_ordinals = HashMap::<String, u64>::new();
+    let mut tx_balances = Vec::new();
+    for tx in &block.transaction_traces {
+        let Some(candidates) = candidates.get(&u64::from(tx.index)) else {
+            continue;
+        };
 
-    storage_deltas
-        .iter()
-        .filter(|delta| pool_balance_delta(delta, false) != BigInt::from(0))
-        .for_each(|delta| {
-            let component_id = String::from_utf8(delta.component_id.clone())
-                .expect("component_id is not valid utf-8!");
-            seed_ordinals
-                .entry(component_id)
-                .and_modify(|ordinal| *ordinal = (*ordinal).min(delta.first_ordinal))
-                .or_insert(delta.first_ordinal);
-        });
+        // A single Vault operation can write the same pool/token balance more than once
+        // (for example yield-fee sync before the actual swap). The write with the highest
+        // ordinal holds the transaction's final balance.
+        let mut last_writes: HashMap<BalanceKey, (u64, BigInt)> = HashMap::new();
+        tx.calls
+            .iter()
+            .filter(|call| !call.state_reverted)
+            .filter(|call| call.address == vault_address)
+            .for_each(|call| {
+                for change in &call.storage_changes {
+                    record_pool_token_balance_write(&mut last_writes, candidates, change);
+                }
+            });
 
-    seed_ordinals
-        .into_iter()
-        .map(|(component_id, ordinal)| BalanceDelta {
-            ord: ordinal,
-            tx: None,
-            token: vec![],
-            delta: vec![],
-            component_id: component_id.into_bytes(),
-        })
-        .collect()
-}
+        if !last_writes.is_empty() {
+            let balances = last_writes
+                .into_iter()
+                .map(|((component_id, token), (_, raw_balance))| BalanceChange {
+                    token,
+                    balance: raw_balance.to_bytes_be().1,
+                    component_id,
+                })
+                .collect();
+            tx_balances.push((Transaction::from(tx), balances));
+        }
+    }
 
-pub(crate) fn relative_pool_balance_deltas(
-    block: &eth::v2::Block,
-    components_store: &StoreGetProto<ProtocolComponent>,
-    seeded_pool_balances: &StoreGetInt64,
-    vault_address: &[u8],
-) -> Vec<BalanceDelta> {
-    let candidates = collect_pool_balance_candidates(block, components_store, vault_address);
-    let storage_deltas = get_pool_token_balance_storage_deltas(block, &candidates, vault_address);
-
-    get_pool_token_balance_deltas(&storage_deltas, seeded_pool_balances)
+    tx_balances
 }
 
 fn collect_pool_balance_candidates(
@@ -131,102 +120,8 @@ fn pool_from_balance_event(log: &eth::v2::Log) -> Option<Vec<u8>> {
     None
 }
 
-fn get_pool_token_balance_storage_deltas(
-    block: &eth::v2::Block,
-    candidate_components: &CandidateComponents,
-    vault_address: &[u8],
-) -> Vec<PoolBalanceStorageDelta> {
-    let mut storage_deltas = Vec::new();
-
-    for tx in &block.transaction_traces {
-        let tx_index = u64::from(tx.index);
-        let Some(candidates) = candidate_components.get(&tx_index) else {
-            continue;
-        };
-
-        // A single Vault operation can write the same pool/token balance more than once
-        // (for example yield-fee sync before the actual swap). Keep one transaction-level
-        // delta per pool/token: earliest old raw balance -> latest new raw balance.
-        let mut tx_storage_deltas: HashMap<BalanceDeltaKey, PoolBalanceStorageDelta> =
-            HashMap::new();
-        let tycho_tx = Transaction::from(tx);
-
-        tx.calls
-            .iter()
-            .filter(|call| !call.state_reverted)
-            .filter(|call| call.address == vault_address)
-            .for_each(|call| {
-                for change in &call.storage_changes {
-                    add_pool_token_balance_storage_delta(
-                        &mut tx_storage_deltas,
-                        tx_index,
-                        &tycho_tx,
-                        candidates,
-                        change,
-                    );
-                }
-            });
-
-        storage_deltas.extend(tx_storage_deltas.into_values());
-    }
-
-    storage_deltas
-}
-
-fn get_pool_token_balance_deltas(
-    storage_deltas: &[PoolBalanceStorageDelta],
-    seeded_pool_balances: &StoreGetInt64,
-) -> Vec<BalanceDelta> {
-    let mut first_ordinals: HashMap<(u64, Vec<u8>), u64> = HashMap::new();
-    storage_deltas.iter().for_each(|delta| {
-        first_ordinals
-            .entry((delta.tx_index, delta.component_id.clone()))
-            .and_modify(|ordinal| *ordinal = (*ordinal).min(delta.first_ordinal))
-            .or_insert(delta.first_ordinal);
-    });
-
-    let mut balance_deltas = Vec::new();
-
-    for value in storage_deltas {
-        let first_ordinal = first_ordinals
-            .get(&(value.tx_index, value.component_id.clone()))
-            .copied()
-            .unwrap_or(value.first_ordinal);
-        let is_seeded = if first_ordinal == 0 {
-            false
-        } else {
-            let component_id = String::from_utf8(value.component_id.clone())
-                .expect("component_id is not valid utf-8!");
-            seeded_pool_balances.has_at(first_ordinal - 1, component_id)
-        };
-        let delta = pool_balance_delta(value, is_seeded);
-
-        if delta != BigInt::from(0) {
-            balance_deltas.push(BalanceDelta {
-                ord: value.ordinal,
-                tx: Some(value.tx.clone()),
-                token: value.token.clone(),
-                delta: delta.to_signed_bytes_be(),
-                component_id: value.component_id.clone(),
-            });
-        }
-    }
-
-    balance_deltas
-}
-
-fn pool_balance_delta(value: &PoolBalanceStorageDelta, is_seeded: bool) -> BigInt {
-    if is_seeded {
-        value.new_raw.clone() - value.old_raw.clone()
-    } else {
-        value.new_raw.clone()
-    }
-}
-
-fn add_pool_token_balance_storage_delta(
-    tx_storage_deltas: &mut HashMap<BalanceDeltaKey, PoolBalanceStorageDelta>,
-    tx_index: u64,
-    tx: &Transaction,
+fn record_pool_token_balance_write(
+    last_writes: &mut HashMap<BalanceKey, (u64, BigInt)>,
     candidates: &HashMap<Vec<u8>, CandidateComponent>,
     change: &StorageChange,
 ) {
@@ -241,36 +136,24 @@ fn add_pool_token_balance_storage_delta(
                 continue;
             }
 
-            let old_raw = raw_balance_from_packed(&change.old_value);
-            let new_raw = raw_balance_from_packed(&change.new_value);
-            let component_id = candidate
-                .component_id
-                .as_bytes()
-                .to_vec();
-            let key = (tx_index, component_id.clone(), token.clone());
+            let raw_balance = raw_balance_from_packed(&change.new_value);
+            let key = (
+                candidate
+                    .component_id
+                    .as_bytes()
+                    .to_vec(),
+                token.clone(),
+            );
 
-            tx_storage_deltas
+            last_writes
                 .entry(key)
-                .and_modify(|value| {
-                    if change.ordinal < value.first_ordinal {
-                        value.first_ordinal = change.ordinal;
-                        value.old_raw = old_raw.clone();
-                    }
-                    if change.ordinal > value.ordinal {
-                        value.ordinal = change.ordinal;
-                        value.new_raw = new_raw.clone();
+                .and_modify(|(ordinal, balance)| {
+                    if change.ordinal > *ordinal {
+                        *ordinal = change.ordinal;
+                        *balance = raw_balance.clone();
                     }
                 })
-                .or_insert_with(|| PoolBalanceStorageDelta {
-                    tx_index,
-                    tx: tx.clone(),
-                    first_ordinal: change.ordinal,
-                    ordinal: change.ordinal,
-                    component_id,
-                    token: token.clone(),
-                    old_raw,
-                    new_raw,
-                });
+                .or_insert((change.ordinal, raw_balance));
         }
     }
 }
@@ -353,31 +236,55 @@ mod tests {
     }
 
     #[test]
-    fn existing_pool_balance_delta_uses_storage_diff() {
-        assert_eq!(
-            pool_balance_delta(&pool_balance_storage_delta(100, 150), true),
-            BigInt::from(50)
-        );
+    fn keeps_the_last_write_per_pool_token() {
+        let pool = hex!("da66e8ddf9959e4db759bfd06256730d8a8b2d13").to_vec();
+        let token = hex!("6b175474e89094c44da98b954eedeac495271d0f").to_vec();
+        let candidates = candidates_for(&pool, &token);
+
+        let mut last_writes = HashMap::new();
+        for (ordinal, raw) in [(5u64, 100u128), (3, 50), (9, 250)] {
+            record_pool_token_balance_write(
+                &mut last_writes,
+                &candidates,
+                &pool_balance_storage_change(&pool, ordinal, raw),
+            );
+        }
+
+        let key = (address_id(&pool).into_bytes(), token);
+        assert_eq!(last_writes[&key], (9, BigInt::from(250)));
     }
 
     #[test]
-    fn unseeded_pool_balance_delta_uses_absolute_new_raw_balance() {
-        assert_eq!(
-            pool_balance_delta(&pool_balance_storage_delta(100, 150), false),
-            BigInt::from(150)
-        );
+    fn ignores_writes_to_other_storage_keys() {
+        let pool = hex!("da66e8ddf9959e4db759bfd06256730d8a8b2d13").to_vec();
+        let token = hex!("6b175474e89094c44da98b954eedeac495271d0f").to_vec();
+        let candidates = candidates_for(&pool, &token);
+
+        let mut change = pool_balance_storage_change(&pool, 1, 100);
+        change.key = vec![0xff; 32];
+
+        let mut last_writes = HashMap::new();
+        record_pool_token_balance_write(&mut last_writes, &candidates, &change);
+
+        assert!(last_writes.is_empty());
     }
 
-    fn pool_balance_storage_delta(old_raw: i32, new_raw: i32) -> PoolBalanceStorageDelta {
-        PoolBalanceStorageDelta {
-            tx_index: 0,
-            tx: Transaction::default(),
-            first_ordinal: 0,
-            ordinal: 1,
-            component_id: vec![],
-            token: vec![],
-            old_raw: BigInt::from(old_raw),
-            new_raw: BigInt::from(new_raw),
+    fn candidates_for(pool: &[u8], token: &[u8]) -> HashMap<Vec<u8>, CandidateComponent> {
+        let component = ProtocolComponent { tokens: vec![token.to_vec()], ..Default::default() };
+        HashMap::from([(
+            pool.to_vec(),
+            CandidateComponent { component_id: address_id(pool), component },
+        )])
+    }
+
+    fn pool_balance_storage_change(pool: &[u8], ordinal: u64, raw: u128) -> StorageChange {
+        let mut new_value = vec![0u8; 32];
+        new_value[16..32].copy_from_slice(&raw.to_be_bytes());
+        StorageChange {
+            key: get_pool_token_balance_storage_key(pool, 0),
+            new_value,
+            ordinal,
+            ..Default::default()
         }
     }
 }

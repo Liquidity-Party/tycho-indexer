@@ -41,5 +41,5 @@ Addresses are sourced from the [Balancer deployments repo](https://github.com/ba
 ## Modules
 
 - `map_components` — discovers pools from factory create calls
-- `map_relative_balances` — tracks pool token balances via Vault storage
-- `map_protocol_changes` — aggregates components, balances, and contract changes
+- `map_protocol_changes` — aggregates components, contract changes, and pool token balances
+  read as absolute values from Vault storage writes

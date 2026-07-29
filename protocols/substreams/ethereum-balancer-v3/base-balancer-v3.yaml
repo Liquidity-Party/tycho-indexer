@@ -51,43 +51,6 @@ modules:
       - params: string
       - source: sf.ethereum.type.v2.Block
 
-  - name: map_pool_balance_seed_events
-    kind: map
-    initialBlock: 25343854
-    inputs:
-      - params: string
-      - source: sf.ethereum.type.v2.Block
-      - store: store_components
-    output:
-      type: proto:tycho.evm.v1.BlockBalanceDeltas
-
-  - name: store_seeded_pool_balances
-    kind: store
-    initialBlock: 25343854
-    updatePolicy: set_if_not_exists
-    valueType: int64
-    inputs:
-      - map: map_pool_balance_seed_events
-
-  - name: map_relative_balances
-    kind: map
-    initialBlock: 25343854
-    inputs:
-      - params: string
-      - source: sf.ethereum.type.v2.Block
-      - store: store_components
-      - store: store_seeded_pool_balances
-    output:
-      type: proto:tycho.evm.v1.BlockBalanceDeltas
-
-  - name: store_balances
-    kind: store
-    initialBlock: 25343854
-    updatePolicy: add
-    valueType: bigint
-    inputs:
-      - map: map_relative_balances
-
   - name: map_protocol_changes
     kind: map
     initialBlock: 25343854
@@ -95,18 +58,13 @@ modules:
       - params: string
       - source: sf.ethereum.type.v2.Block
       - map: map_components
-      - map: map_relative_balances
       - store: store_components
       - store: store_token_set
       - store: store_token_mapping
-      - store: store_balances
-        mode: deltas
     output:
       type: proto:tycho.evm.v1.BlockChanges
 
 params:
   map_components: vault=ba1333333333a1ba1108e8412f11850a5c319ba9&vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9&batch_router=85a80afee867adf27b50bdb7b76da70f1e853062&permit2=000000000022d473030f116ddee9f6b43ac78ba3&weighted_factory=bdbadc891bb95dee80ebc491699228ef0f7d6ff1&stable_factory=fc2986feab34713e659da84f3b1fa32c1da95832&reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff&skip_rate_provider_pools=true
   store_token_mapping: vault=ba1333333333a1ba1108e8412f11850a5c319ba9&vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9&batch_router=85a80afee867adf27b50bdb7b76da70f1e853062&permit2=000000000022d473030f116ddee9f6b43ac78ba3&weighted_factory=bdbadc891bb95dee80ebc491699228ef0f7d6ff1&stable_factory=fc2986feab34713e659da84f3b1fa32c1da95832&reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff
-  map_pool_balance_seed_events: vault=ba1333333333a1ba1108e8412f11850a5c319ba9&vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9&batch_router=85a80afee867adf27b50bdb7b76da70f1e853062&permit2=000000000022d473030f116ddee9f6b43ac78ba3&weighted_factory=bdbadc891bb95dee80ebc491699228ef0f7d6ff1&stable_factory=fc2986feab34713e659da84f3b1fa32c1da95832&reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff
-  map_relative_balances: vault=ba1333333333a1ba1108e8412f11850a5c319ba9&vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9&batch_router=85a80afee867adf27b50bdb7b76da70f1e853062&permit2=000000000022d473030f116ddee9f6b43ac78ba3&weighted_factory=bdbadc891bb95dee80ebc491699228ef0f7d6ff1&stable_factory=fc2986feab34713e659da84f3b1fa32c1da95832&reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff
   map_protocol_changes: vault=ba1333333333a1ba1108e8412f11850a5c319ba9&vault_extension=0e8b07657d719b86e06bf0806d6729e3d528c9a9&batch_router=85a80afee867adf27b50bdb7b76da70f1e853062&permit2=000000000022d473030f116ddee9f6b43ac78ba3&weighted_factory=bdbadc891bb95dee80ebc491699228ef0f7d6ff1&stable_factory=fc2986feab34713e659da84f3b1fa32c1da95832&reclamm_factory=3ccd78683effffddc1a16f5553c896ac6d3ab7ff

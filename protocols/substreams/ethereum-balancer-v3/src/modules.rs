@@ -13,22 +13,18 @@ use crate::{
 use anyhow::Result;
 use itertools::Itertools;
 use std::collections::HashMap;
-use substreams::{
-    pb::substreams::StoreDeltas,
-    store::{
-        StoreAddBigInt, StoreGet, StoreGetInt64, StoreGetProto, StoreGetString, StoreNew,
-        StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto,
-        StoreSetIfNotExistsString,
-    },
+use substreams::store::{
+    StoreGet, StoreGetInt64, StoreGetProto, StoreGetString, StoreNew, StoreSetIfNotExists,
+    StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetIfNotExistsString,
 };
 use substreams_ethereum::{
     pb::eth::{self, v2::StorageChange},
     Event, Function,
 };
 use tycho_substreams::{
-    attributes::json_deserialize_address_list, balances::aggregate_balances_changes,
-    block_storage::get_block_storage_changes, contract::extract_contract_changes_builder,
-    entrypoint::create_entrypoint, models::entry_point_params::TraceData, prelude::*,
+    attributes::json_deserialize_address_list, block_storage::get_block_storage_changes,
+    contract::extract_contract_changes_builder, entrypoint::create_entrypoint,
+    models::entry_point_params::TraceData, prelude::*,
 };
 
 #[substreams::handlers::map]
@@ -121,55 +117,6 @@ pub fn store_token_mapping(
     });
 }
 
-#[substreams::handlers::map]
-pub fn map_pool_balance_seed_events(
-    params: String,
-    block: eth::v2::Block,
-    store: StoreGetProto<ProtocolComponent>,
-) -> Result<BlockBalanceDeltas, anyhow::Error> {
-    let config = DeploymentConfig::parse(&params)?;
-    Ok(BlockBalanceDeltas {
-        balance_deltas: pool_balances::pool_balance_seed_deltas(&block, &store, &config.vault),
-    })
-}
-
-#[substreams::handlers::store]
-pub fn store_seeded_pool_balances(deltas: BlockBalanceDeltas, store: StoreSetIfNotExistsInt64) {
-    deltas
-        .balance_deltas
-        .into_iter()
-        .for_each(|delta| {
-            let component_id = String::from_utf8(delta.component_id)
-                .expect("delta.component_id is not valid utf-8!");
-            store.set_if_not_exists(delta.ord, component_id, &1);
-        });
-}
-
-#[substreams::handlers::map]
-pub fn map_relative_balances(
-    params: String,
-    block: eth::v2::Block,
-    components_store: StoreGetProto<ProtocolComponent>,
-    seeded_pool_balances: StoreGetInt64,
-) -> Result<BlockBalanceDeltas, anyhow::Error> {
-    let config = DeploymentConfig::parse(&params)?;
-    Ok(BlockBalanceDeltas {
-        balance_deltas: pool_balances::relative_pool_balance_deltas(
-            &block,
-            &components_store,
-            &seeded_pool_balances,
-            &config.vault,
-        ),
-    })
-}
-
-/// It's significant to include both the `pool_id` and the `token_id` for each balance delta as the
-///  store key to ensure that there's a unique balance being tallied for each.
-#[substreams::handlers::store]
-pub fn store_balances(deltas: BlockBalanceDeltas, store: StoreAddBigInt) {
-    tycho_substreams::balances::store_balance_changes(deltas, store);
-}
-
 /// This is the main map that handles most of the indexing of this substream.
 /// Every contract change is grouped by transaction index via the `transaction_changes`
 ///  map. Each block of code will extend the `TransactionChanges` struct with the
@@ -181,11 +128,9 @@ pub fn map_protocol_changes(
     params: String,
     block: eth::v2::Block,
     grouped_components: BlockTransactionProtocolComponents,
-    deltas: BlockBalanceDeltas,
     components_store: StoreGetProto<ProtocolComponent>,
     tokens_store: StoreGetInt64,
     token_mapping_store: StoreGetString,
-    balance_store: StoreDeltas, // Note, this map module is using the `deltas` mode for the store.
 ) -> Result<BlockChanges> {
     let config = DeploymentConfig::parse(&params)?;
     let vault_address = config.vault.as_slice();
@@ -293,24 +238,19 @@ pub fn map_protocol_changes(
                 });
         });
 
-    // Balance changes are gathered by the `StoreDelta` based on `PoolBalanceChanged` creating
-    //  `BlockBalanceDeltas`. We essentially just process the changes that occurred to the `store`
-    // this  block. Then, these balance changes are merged onto the existing map of tx contract
-    // changes,  inserting a new one if it doesn't exist.
-    aggregate_balances_changes(balance_store, deltas)
-        .iter()
-        .for_each(|(_, (tx, balances))| {
+    // Pool token balances are read as absolute values from the Vault's `_poolTokenBalances`
+    // storage writes and merged onto the existing map of tx changes, inserting a new one if
+    // it doesn't exist.
+    pool_balances::absolute_pool_balances(&block, &components_store, vault_address)
+        .into_iter()
+        .for_each(|(tx, balances)| {
             let builder = transaction_changes
                 .entry(tx.index)
-                .or_insert_with(|| TransactionChangesBuilder::new(tx));
+                .or_insert_with(|| TransactionChangesBuilder::new(&tx));
 
-            balances
-                .values()
-                .for_each(|token_bc_map| {
-                    token_bc_map.values().for_each(|bc| {
-                        builder.add_balance_change(bc);
-                    })
-                });
+            for balance_change in &balances {
+                builder.add_balance_change(balance_change);
+            }
         });
 
     // Extract and insert any storage changes that happened for any of the components.
@@ -319,8 +259,8 @@ pub fn map_protocol_changes(
         |addr| {
             components_store
                 .get_last(pool_store_key(addr))
-                .is_some() ||
-                addr.eq(vault_address)
+                .is_some()
+                || addr.eq(vault_address)
         },
         &mut transaction_changes,
     );
