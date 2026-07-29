@@ -144,7 +144,8 @@ impl ApiConfig {
     /// Reads the Angstrom API configuration from the environment.
     ///
     /// Returns the reason Angstrom swaps cannot be encoded when `ANGSTROM_API_KEY` is unset,
-    /// which is how consumers that do not route over Angstrom opt out.
+    /// which is how consumers that do not route over Angstrom opt out, or when
+    /// `ANGSTROM_BLOCKS_IN_FUTURE` is set to something that is not a block count.
     fn from_env() -> Result<Self, String> {
         let key = env::var("ANGSTROM_API_KEY").map_err(|_| {
             "ANGSTROM_API_KEY environment variable is required for Angstrom swaps".to_string()
@@ -157,10 +158,12 @@ impl ApiConfig {
 
         let url =
             env::var("ANGSTROM_API_URL").unwrap_or_else(|_| ANGSTROM_DEFAULT_API_URL.to_string());
-        let blocks_in_future = env::var("ANGSTROM_BLOCKS_IN_FUTURE")
-            .ok()
-            .and_then(|blocks| blocks.parse().ok())
-            .unwrap_or(ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE);
+        let blocks_in_future = match env::var("ANGSTROM_BLOCKS_IN_FUTURE") {
+            Ok(blocks) => blocks.parse().map_err(|e| {
+                format!("ANGSTROM_BLOCKS_IN_FUTURE is set to '{blocks}', not a block count: {e}")
+            })?,
+            Err(_) => ANGSTROM_DEFAULT_BLOCKS_IN_FUTURE,
+        };
 
         Ok(Self { client, url, key, blocks_in_future })
     }
@@ -351,6 +354,23 @@ mod tests {
         cache.refresh().unwrap_err();
 
         assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_unparsable_blocks_in_future_is_rejected() {
+        env::set_var("ANGSTROM_API_KEY", "test-key");
+        env::set_var("ANGSTROM_BLOCKS_IN_FUTURE", "five");
+
+        let err = ApiConfig::from_env().err();
+
+        env::remove_var("ANGSTROM_BLOCKS_IN_FUTURE");
+        env::remove_var("ANGSTROM_API_KEY");
+
+        let err = err.expect("an unparsable block count must be rejected");
+        assert!(
+            err.contains("ANGSTROM_BLOCKS_IN_FUTURE is set to 'five'"),
+            "unexpected error: {err}"
+        );
     }
 
     /// Reads the current block number over JSON-RPC, using `RPC_URL`.
