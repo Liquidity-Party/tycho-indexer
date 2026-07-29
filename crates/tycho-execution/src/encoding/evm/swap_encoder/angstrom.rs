@@ -30,16 +30,16 @@ use crate::encoding::{
 
 static CACHE: OnceLock<Arc<AttestationCache>> = OnceLock::new();
 
-/// The attestation window every Angstrom swap encodes, kept warm by a background thread.
+/// Fetches attestations for the current block and the next `ANGSTROM_BLOCKS_IN_FUTURE` blocks.
+type WindowFetcher = Box<dyn Fn() -> Result<AttestationResponse, EncodingError> + Send + Sync>;
+
+/// How to fetch an attestation window, or why it cannot be fetched, plus the last one fetched.
 ///
-/// Every refresh replaces the whole window rather than appending to it, so the cache holds one
-/// window of `ANGSTROM_BLOCKS_IN_FUTURE + 1` attestations at a time and does not grow with
-/// uptime.
+/// A refresh replaces the whole window rather than appending to it, so this holds one window of
+/// `ANGSTROM_BLOCKS_IN_FUTURE + 1` attestations and does not grow with uptime.
 pub(crate) struct AttestationCache {
-    /// The configured API client, or the reason Angstrom swaps cannot be encoded.
-    api: Result<ApiConfig, String>,
-    /// The window from the most recent successful fetch, or `None` until the first one lands.
-    latest: RwLock<Option<CachedWindow>>,
+    fetcher: Result<WindowFetcher, String>,
+    window: RwLock<Option<CachedWindow>>,
 }
 
 impl AttestationCache {
@@ -50,7 +50,8 @@ impl AttestationCache {
     /// already finds a warm cache.
     pub(crate) fn global() -> &'static Arc<Self> {
         CACHE.get_or_init(|| {
-            let cache = Arc::new(Self { api: ApiConfig::from_env(), latest: RwLock::new(None) });
+            let fetcher = ApiConfig::from_env().map(ApiConfig::into_fetcher);
+            let cache = Arc::new(Self { fetcher, window: RwLock::new(None) });
             Arc::clone(&cache).spawn_refresher();
             cache
         })
@@ -65,16 +66,16 @@ impl AttestationCache {
     /// Returns an error if the fallback fetch fails, or if it is needed while the Angstrom API
     /// is unconfigured.
     pub(crate) fn hook_data(&self) -> Result<Vec<u8>, EncodingError> {
-        let latest = self
-            .latest
+        let cached = self
+            .window
             .read()
             .unwrap_or_else(PoisonError::into_inner);
-        if let Some(window) = latest.as_ref() {
+        if let Some(window) = cached.as_ref() {
             if window.fetched_at.elapsed() <= ANGSTROM_ATTESTATION_MAX_AGE {
                 return Ok(window.encoded.clone());
             }
         }
-        drop(latest);
+        drop(cached);
 
         warn!("Angstrom attestation cache is cold or stale, fetching while encoding");
         self.refresh()
@@ -82,14 +83,14 @@ impl AttestationCache {
 
     /// Fetches the current attestation window into the cache and returns it.
     fn refresh(&self) -> Result<Vec<u8>, EncodingError> {
-        let api = self
-            .api
+        let fetcher = self
+            .fetcher
             .as_ref()
             .map_err(|reason| EncodingError::FatalError(reason.clone()))?;
 
-        let encoded = encode_attestations(&api.fetch_off_runtime()?)?;
+        let encoded = encode_attestations(&fetcher()?)?;
         *self
-            .latest
+            .window
             .write()
             .unwrap_or_else(PoisonError::into_inner) =
             Some(CachedWindow { encoded: encoded.clone(), fetched_at: Instant::now() });
@@ -104,7 +105,7 @@ impl AttestationCache {
     /// or not its consumer runs a runtime, and because the blocking API client cannot be driven
     /// from inside one.
     fn spawn_refresher(self: Arc<Self>) {
-        if self.api.is_err() {
+        if self.fetcher.is_err() {
             return;
         }
 
@@ -166,6 +167,12 @@ impl ApiConfig {
         };
 
         Ok(Self { client, url, key, blocks_in_future })
+    }
+
+    /// Moves the client behind the cache's fetch, keeping its connection pool warm across
+    /// refreshes.
+    fn into_fetcher(self) -> WindowFetcher {
+        Box::new(move || self.fetch_off_runtime())
     }
 
     /// Fetches the current attestation window on a thread of its own.
@@ -287,7 +294,10 @@ pub(crate) struct AttestationData {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
 
     use super::*;
 
@@ -308,10 +318,32 @@ mod tests {
         }
     }
 
-    /// A cache with no API configured, so that any fetch fails with a known message instead of
-    /// reaching the network.
-    fn unconfigured_cache(window: Option<CachedWindow>) -> AttestationCache {
-        AttestationCache { api: Err("no API key".to_string()), latest: RwLock::new(window) }
+    /// A cache serving `fetcher` instead of the Angstrom API.
+    fn cache_with(fetcher: WindowFetcher, window: Option<CachedWindow>) -> AttestationCache {
+        AttestationCache { fetcher: Ok(fetcher), window: RwLock::new(window) }
+    }
+
+    /// A fetch answering `attestation_response()` from memory, alongside its call count.
+    fn counted_fetch() -> (WindowFetcher, Arc<AtomicUsize>) {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&calls);
+
+        let fetcher: WindowFetcher = Box::new(move || {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Ok(attestation_response())
+        });
+
+        (fetcher, calls)
+    }
+
+    /// A fetch standing in for an Angstrom API that cannot be reached.
+    fn failing_fetch() -> WindowFetcher {
+        Box::new(|| Err(EncodingError::RecoverableError("the API is down".to_string())))
+    }
+
+    /// The window `counted_fetch` puts in the cache, as `hook_data` returns it.
+    fn fetched_window() -> Vec<u8> {
+        encode_attestations(&attestation_response()).unwrap()
     }
 
     fn window_fetched_ago(age: Duration) -> Option<CachedWindow> {
@@ -321,39 +353,65 @@ mod tests {
         Some(CachedWindow { encoded: vec![1, 2, 3], fetched_at })
     }
 
+    fn stale() -> Option<CachedWindow> {
+        window_fetched_ago(ANGSTROM_ATTESTATION_MAX_AGE + Duration::from_secs(1))
+    }
+
     #[test]
-    fn test_fresh_window_is_served_without_the_api() {
-        let cache = unconfigured_cache(window_fetched_ago(Duration::ZERO));
+    fn test_fresh_window_is_served_without_a_fetch() {
+        let (fetch, calls) = counted_fetch();
+        let cache = cache_with(fetch, window_fetched_ago(Duration::ZERO));
 
         assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]
-    fn test_stale_window_triggers_a_fetch() {
-        let stale = ANGSTROM_ATTESTATION_MAX_AGE + Duration::from_secs(1);
-        let cache = unconfigured_cache(window_fetched_ago(stale));
+    fn test_stale_window_is_replaced_by_a_fetch() {
+        let (fetch, calls) = counted_fetch();
+        let cache = cache_with(fetch, stale());
 
-        let err = cache.hook_data().unwrap_err();
-
-        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
+        assert_eq!(cache.hook_data().unwrap(), fetched_window());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    fn test_cold_cache_triggers_a_fetch() {
-        let err = unconfigured_cache(None)
-            .hook_data()
-            .unwrap_err();
+    fn test_cold_cache_is_filled_by_a_fetch() {
+        let (fetch, calls) = counted_fetch();
+        let cache = cache_with(fetch, None);
 
-        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
+        assert_eq!(cache.hook_data().unwrap(), fetched_window());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_fetched_window_is_served_to_the_next_caller() {
+        let (fetch, calls) = counted_fetch();
+        let cache = cache_with(fetch, None);
+
+        cache.hook_data().unwrap();
+
+        assert_eq!(cache.hook_data().unwrap(), fetched_window());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     fn test_failed_refresh_keeps_the_previous_window() {
-        let cache = unconfigured_cache(window_fetched_ago(Duration::ZERO));
+        let cache = cache_with(failing_fetch(), window_fetched_ago(Duration::ZERO));
 
-        cache.refresh().unwrap_err();
+        let err = cache.refresh().unwrap_err();
 
+        assert_eq!(err, EncodingError::RecoverableError("the API is down".to_string()));
         assert_eq!(cache.hook_data().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_failed_fetch_surfaces_on_a_stale_window() {
+        let cache = cache_with(failing_fetch(), stale());
+
+        let err = cache.hook_data().unwrap_err();
+
+        assert_eq!(err, EncodingError::RecoverableError("the API is down".to_string()));
     }
 
     #[test]
