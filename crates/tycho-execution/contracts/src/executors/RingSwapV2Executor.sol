@@ -84,6 +84,7 @@ contract RingSwapV2Executor is IExecutor {
             IUniswapV2Pair(target), fwAmountIn, zeroForOne, address(this)
         );
 
+        // slither-disable-next-line unused-return
         IFewWrappedToken(fwTokenOut).unwrapTo(fwAmountOut, receiver);
     }
 
