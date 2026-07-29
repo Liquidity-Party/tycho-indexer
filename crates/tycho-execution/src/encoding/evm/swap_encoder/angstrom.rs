@@ -77,6 +77,10 @@ impl AttestationCache {
         }
         drop(cached);
 
+        if let Err(reason) = &self.fetcher {
+            return Err(EncodingError::FatalError(reason.clone()));
+        }
+
         warn!("Angstrom attestation cache is cold or stale, fetching while encoding");
         self.refresh()
     }
@@ -336,6 +340,11 @@ mod tests {
         (fetcher, calls)
     }
 
+    /// A cache belonging to a consumer that never configured the Angstrom API.
+    fn unconfigured_cache() -> AttestationCache {
+        AttestationCache { fetcher: Err("no API key".to_string()), window: RwLock::new(None) }
+    }
+
     /// A fetch standing in for an Angstrom API that cannot be reached.
     fn failing_fetch() -> WindowFetcher {
         Box::new(|| Err(EncodingError::RecoverableError("the API is down".to_string())))
@@ -393,6 +402,15 @@ mod tests {
 
         assert_eq!(cache.hook_data().unwrap(), fetched_window());
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_unconfigured_cache_reports_the_configuration_error() {
+        let err = unconfigured_cache()
+            .hook_data()
+            .unwrap_err();
+
+        assert_eq!(err, EncodingError::FatalError("no API key".to_string()));
     }
 
     #[test]
