@@ -862,14 +862,8 @@ mod tests {
 
     #[test]
     fn test_robinhood_default_tvl_threshold() {
-        assert_eq!(
-            Chain::Robinhood.default_tvl_threshold(TvlThresholdTier::Low),
-            10.0
-        );
-        assert_eq!(
-            Chain::Robinhood.default_tvl_threshold(TvlThresholdTier::Medium),
-            100.0
-        );
+        assert_eq!(Chain::Robinhood.default_tvl_threshold(TvlThresholdTier::Low), 10.0);
+        assert_eq!(Chain::Robinhood.default_tvl_threshold(TvlThresholdTier::Medium), 100.0);
     }
 
     #[test]
