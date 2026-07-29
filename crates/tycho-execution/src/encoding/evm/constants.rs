@@ -95,7 +95,13 @@ pub(crate) const ANGSTROM_ATTESTATION_MAX_AGE: Duration =
     Duration::from_secs(ETHEREUM_MIN_BLOCK_TIME_SECS * ANGSTROM_ATTESTATION_MAX_AGE_BLOCKS);
 
 /// How long a single request to the Angstrom API may take before it is aborted.
-pub(crate) const ANGSTROM_API_TIMEOUT: Duration = Duration::from_secs(2);
+///
+/// Half the refresh interval, so one timed-out refresh cannot reach the encoding path: the next
+/// refresh still replaces the window within `ANGSTROM_ATTESTATION_MAX_AGE` of the previous one
+/// (3s aborted + 6s sleep + at most 3s for the retry). The slowest read measured against the
+/// live API was 902ms, including DNS and TLS on a cold connection.
+pub(crate) const ANGSTROM_API_TIMEOUT: Duration =
+    Duration::from_secs(ANGSTROM_ATTESTATION_REFRESH_INTERVAL.as_secs() / 2);
 
 /// These protocols support the optimization of grouping swaps.
 ///
@@ -119,3 +125,22 @@ pub static NON_PLE_ENCODED_PROTOCOLS: LazyLock<HashSet<&'static str>> = LazyLock
     set.insert("ekubo_v3");
     set
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The timings only keep inline fetches off the encoding path while a timed-out refresh plus
+    /// the retry that follows it still fit inside the maximum window age.
+    #[test]
+    fn test_one_timed_out_refresh_cannot_stale_the_window() {
+        let slowest_recovery =
+            ANGSTROM_API_TIMEOUT + ANGSTROM_ATTESTATION_REFRESH_INTERVAL + ANGSTROM_API_TIMEOUT;
+
+        assert!(
+            slowest_recovery <= ANGSTROM_ATTESTATION_MAX_AGE,
+            "a single timed-out refresh leaves the window stale for {slowest_recovery:?}, past \
+             the {ANGSTROM_ATTESTATION_MAX_AGE:?} maximum age"
+        );
+    }
+}
