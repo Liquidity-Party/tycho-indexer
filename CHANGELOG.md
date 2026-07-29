@@ -1,3 +1,21 @@
+## [0.343.0](https://github.com/propeller-heads/tycho/compare/0.342.0...0.343.0) (2026-07-29)
+
+
+### Features
+
+* add Robinhood as a first-class chain ([e47f1a6](https://github.com/propeller-heads/tycho/commit/e47f1a6cb9c3240b1c6efa85cbab57cbad237b28))
+* add Robinhood as a first-class chain ([#1247](https://github.com/propeller-heads/tycho/issues/1247)) ([4cb0ce8](https://github.com/propeller-heads/tycho/commit/4cb0ce85e3011c1e435a000dbfdbba95c0eb0e12))
+* add Robinhood Chain substreams YAML configs (Uniswap V2 + V3) ([4b96aef](https://github.com/propeller-heads/tycho/commit/4b96aefc7c35b1ab9cac427aec8e11a395ad9c6b))
+* add Robinhood Chain substreams YAML configs (Uniswap V2 + V3) ([#1245](https://github.com/propeller-heads/tycho/issues/1245)) ([871fdb9](https://github.com/propeller-heads/tycho/commit/871fdb94e022ddc0ffe081eea9c939c76dc58468))
+* add Robinhood Uniswap V4 no-hooks Substreams manifest ([a7c0c9d](https://github.com/propeller-heads/tycho/commit/a7c0c9d8368eca4f68e4b6ab96c11f5cb81d7ef2))
+* add Robinhood Uniswap V4 no-hooks Substreams manifest ([#1249](https://github.com/propeller-heads/tycho/issues/1249)) ([c07dd30](https://github.com/propeller-heads/tycho/commit/c07dd30468ca7998f9b870cc2b53125a4cc92c81))
+
+
+### Bug Fixes
+
+* align Robinhood Substreams packages with CI ([f940afd](https://github.com/propeller-heads/tycho/commit/f940afd3a34468592c155ecfd0545f54ac3628ba))
+* update Uniswap V4 package compatibility ([a8bc64c](https://github.com/propeller-heads/tycho/commit/a8bc64c973c9dc5b7adf38fd0b9293ae50df211f))
+
 ## [0.342.0](https://github.com/propeller-heads/tycho/compare/0.341.11...0.342.0) (2026-07-29)
 
 
