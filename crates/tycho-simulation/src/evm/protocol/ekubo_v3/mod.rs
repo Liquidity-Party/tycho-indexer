@@ -2,7 +2,7 @@ use decoder::{extension_type, ExtensionType};
 use revm::primitives::Address;
 use tycho_client::feed::synchronizer::ComponentWithState;
 
-mod addresses;
+pub(crate) mod addresses;
 mod attributes;
 mod decoder;
 mod pool;
@@ -109,6 +109,19 @@ mod tests {
         for case in [component(None), component(Some(Bytes::from(vec![0u8; 19])))] {
             assert!(!filter_fn(&case));
             assert!(!filter_fn_with_signed_exclusive_swap(&case));
+        }
+    }
+
+    /// `EXCLUSIVE_EXTENSIONS` and the filters must agree: every listed marker is excluded by the
+    /// default filter and admitted by the inclusive one, so consumers classifying with the list
+    /// see exactly the components the inclusive filter let through.
+    #[test]
+    fn exclusive_extensions_consistent_with_filters() {
+        for extension in crate::evm::protocol::EXCLUSIVE_EXTENSIONS {
+            let component = with_extension(*extension);
+
+            assert!(!filter_fn(&component));
+            assert!(filter_fn_with_signed_exclusive_swap(&component));
         }
     }
 }
