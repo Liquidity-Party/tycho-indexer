@@ -1,3 +1,15 @@
+## [0.342.0](https://github.com/propeller-heads/tycho/compare/0.341.11...0.342.0) (2026-07-29)
+
+
+### Features
+
+* **ekubo_v3:** exclude SignedExclusiveSwap pools by default ([1a32a58](https://github.com/propeller-heads/tycho/commit/1a32a5831b8212eb985c1f226dbe6d9bc748204d))
+
+
+### Bug Fixes
+
+* **ekubo_v3:** exclude SignedExclusiveSwap pools by default ([#1242](https://github.com/propeller-heads/tycho/issues/1242)) ([81246b9](https://github.com/propeller-heads/tycho/commit/81246b9c891493f4b93c4c685f41126d9a5a263b))
+
 ## [0.341.11](https://github.com/propeller-heads/tycho/compare/0.341.10...0.341.11) (2026-07-29)
 
 
