@@ -207,6 +207,46 @@ contract RingSwapV2ExecutorTest is Constants, TestUtils {
         ringSwapV2Exposed.getTransferData(params);
     }
 
+    function testGetTransferDataRejectsZeroFewTokenForUnregisteredToken()
+        public
+    {
+        address unregisteredToken = makeAddr("unregistered-token");
+        bytes memory params = abi.encodePacked(
+            address(0), unregisteredToken, WETH_ADDR, address(0), FW_WETH
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidFewToken.selector,
+                unregisteredToken,
+                address(0)
+            )
+        );
+        ringSwapV2Exposed.getTransferData(params);
+    }
+
+    function testGetTransferDataRejectsZeroPairWhenFactoryReturnsZero() public {
+        vm.mockCall(
+            RING_SWAP_FACTORY,
+            abi.encodeWithSignature(
+                "getPair(address,address)", FW_DAI, FW_WETH
+            ),
+            abi.encode(address(0))
+        );
+        bytes memory params =
+            abi.encodePacked(address(0), DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RingSwapV2Executor__InvalidPair.selector,
+                address(0),
+                FW_DAI,
+                FW_WETH
+            )
+        );
+        ringSwapV2Exposed.getTransferData(params);
+    }
+
     function testFundsExpectedAddressUsesRouterContext() public view {
         bytes memory params = abi.encodePacked(
             RING_DAI_WETH_PAIR, DAI_ADDR, WETH_ADDR, FW_DAI, FW_WETH

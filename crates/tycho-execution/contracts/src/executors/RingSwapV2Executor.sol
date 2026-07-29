@@ -109,7 +109,10 @@ contract RingSwapV2Executor is IExecutor {
     }
 
     function _validateFewToken(address token, address fwToken) internal view {
-        if (IFewFactory(fewFactory).getWrappedToken(token) != fwToken) {
+        if (
+            fwToken == address(0)
+                || IFewFactory(fewFactory).getWrappedToken(token) != fwToken
+        ) {
             revert RingSwapV2Executor__InvalidFewToken(token, fwToken);
         }
     }
@@ -131,8 +134,9 @@ contract RingSwapV2Executor is IExecutor {
         view
     {
         if (
-            IRingSwapV2Factory(ringSwapFactory).getPair(fwTokenIn, fwTokenOut)
-                != pair
+            pair == address(0)
+                || IRingSwapV2Factory(ringSwapFactory)
+                        .getPair(fwTokenIn, fwTokenOut) != pair
         ) {
             revert RingSwapV2Executor__InvalidPair(pair, fwTokenIn, fwTokenOut);
         }
