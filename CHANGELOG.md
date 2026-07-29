@@ -1,3 +1,12 @@
+## [0.341.10](https://github.com/propeller-heads/tycho/compare/0.341.9...0.341.10) (2026-07-29)
+
+
+### Bug Fixes
+
+* **simulation:** refresh both balance maps in VM update_pool_state ([39a2f82](https://github.com/propeller-heads/tycho/commit/39a2f82983e600c375ba376fd3cdb5ba0c920248))
+* **simulation:** refresh both VM balance maps and make the price-query caller configurable ([#1234](https://github.com/propeller-heads/tycho/issues/1234)) ([e241055](https://github.com/propeller-heads/tycho/commit/e241055b8fec276579a79fb3891c214e9cf7500b))
+* **simulation:** use zero tx.origin for Balancer V3 price queries ([de68cc2](https://github.com/propeller-heads/tycho/commit/de68cc2e4bc9c155f3b2f30f17264abb53b320b1))
+
 ## [0.341.9](https://github.com/propeller-heads/tycho/compare/0.341.8...0.341.9) (2026-07-29)
 
 
