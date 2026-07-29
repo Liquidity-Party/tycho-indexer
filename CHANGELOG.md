@@ -1,3 +1,20 @@
+## [0.344.0](https://github.com/propeller-heads/tycho/compare/0.343.0...0.344.0) (2026-07-29)
+
+
+### Features
+
+* **execution:** prefetch Angstrom attestations in the background ([f0c7a06](https://github.com/propeller-heads/tycho/commit/f0c7a06ad5c2b25193983eb1566771e69f8c545c))
+* **execution:** prefetch Angstrom attestations in the background ([#1241](https://github.com/propeller-heads/tycho/issues/1241)) ([88f1696](https://github.com/propeller-heads/tycho/commit/88f169632942987f40eb275539d00135f44feaab))
+
+
+### Bug Fixes
+
+* **execution:** fail on an unparsable ANGSTROM_BLOCKS_IN_FUTURE ([4a72e0e](https://github.com/propeller-heads/tycho/commit/4a72e0e9bb20983aaacff36b6147c7c834b5f87d))
+* **execution:** keep the caller's slack when serving a cached window ([bef440d](https://github.com/propeller-heads/tycho/commit/bef440d55a47ab8f646b9d62c26bb905f48690c8))
+* **execution:** raise the Angstrom API timeout to half the refresh interval ([fa18e35](https://github.com/propeller-heads/tycho/commit/fa18e35bed501aaca8a081a25a2e74d23f2d227d))
+* **execution:** reject an empty Angstrom attestation window ([dd5d8e2](https://github.com/propeller-heads/tycho/commit/dd5d8e2136629bb13789245555605c764cd8504a))
+* **execution:** report a missing API key instead of a cold cache ([b058a5d](https://github.com/propeller-heads/tycho/commit/b058a5d71e32c34e94ffdf4547eea5196878ebd2))
+
 ## [0.343.0](https://github.com/propeller-heads/tycho/compare/0.342.0...0.343.0) (2026-07-29)
 
 
