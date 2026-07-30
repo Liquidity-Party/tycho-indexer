@@ -284,30 +284,6 @@ pub fn map_protocol_changes(
             }
         });
 
-    transaction_changes
-        .iter_mut()
-        .for_each(|(_, change)| {
-            // this indirection is necessary due to borrowing rules.
-            let addresses = change
-                .changed_contracts()
-                .map(|e| e.to_vec())
-                .collect::<Vec<_>>();
-
-            addresses
-                .into_iter()
-                .for_each(|address| {
-                    if address != vault_address {
-                        // We reconstruct the component_id from the address here
-                        let id = components_store
-                            .get_last(pool_store_key(&address))
-                            .map(|c| c.id)
-                            .unwrap(); // Shouldn't happen because we filter by known components
-                                       // in `extract_contract_changes_builder`
-                        change.mark_component_as_updated(&id);
-                    }
-                })
-        });
-
     let block_storage_changes = get_block_storage_changes(&block);
 
     // Process all `transaction_changes` for final output in the `BlockChanges`,
