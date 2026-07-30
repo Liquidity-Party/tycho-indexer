@@ -185,11 +185,6 @@ pub fn map_protocol_changes(
             value: address_id(&config.permit2).into_bytes(),
             change: ChangeType::Creation.into(),
         },
-        Attribute {
-            name: "update_marker".to_string(),
-            value: vec![1u8],
-            change: ChangeType::Creation.into(),
-        },
     ];
     grouped_components
         .tx_components
