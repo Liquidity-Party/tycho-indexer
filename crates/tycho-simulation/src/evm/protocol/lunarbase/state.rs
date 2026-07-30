@@ -50,9 +50,8 @@ impl LunarBaseState {
     }
 
     pub fn is_fresh(&self) -> bool {
-        self.head_block
-            < self
-                .latest_update_block
+        self.head_block <
+            self.latest_update_block
                 .saturating_add(self.block_delay)
     }
 

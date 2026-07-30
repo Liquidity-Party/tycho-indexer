@@ -146,8 +146,8 @@ impl ProtocolSim for MetricState {
         let mid = (bid + ask) / 2.0;
         if base.address == self.base_token.address && quote.address == self.quote_token.address {
             Ok(mid)
-        } else if base.address == self.quote_token.address
-            && quote.address == self.base_token.address
+        } else if base.address == self.quote_token.address &&
+            quote.address == self.base_token.address
         {
             Ok(1.0 / mid)
         } else {
@@ -318,10 +318,10 @@ impl ProtocolSim for MetricState {
             .as_any()
             .downcast_ref::<MetricState>()
         {
-            self.base_token == other_state.base_token
-                && self.quote_token == other_state.quote_token
-                && self.metadata == other_state.metadata
-                && self.bid_ask == other_state.bid_ask
+            self.base_token == other_state.base_token &&
+                self.quote_token == other_state.quote_token &&
+                self.metadata == other_state.metadata &&
+                self.bid_ask == other_state.bid_ask
         } else {
             false
         }

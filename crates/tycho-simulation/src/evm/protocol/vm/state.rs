@@ -382,8 +382,8 @@ where
                         })?;
                         let sell_token_decimals = self.get_decimals(tokens, &sell_token_address)?;
                         let buy_token_decimals = self.get_decimals(tokens, &buy_token_address)?;
-                        *unscaled_price * 10f64.powi(sell_token_decimals as i32)
-                            / 10f64.powi(buy_token_decimals as i32)
+                        *unscaled_price * 10f64.powi(sell_token_decimals as i32) /
+                            10f64.powi(buy_token_decimals as i32)
                     };
 
                     self.spot_prices
@@ -641,8 +641,8 @@ where
         for token in tokens.iter().skip(1) {
             if self
                 .self_contained_tokens
-                .contains(token)
-                && !self
+                .contains(token) &&
+                !self
                     .disable_overwrite_tokens
                     .contains(token)
             {
@@ -782,8 +782,8 @@ where
         )?;
         let (sell_amount_respecting_limit, sell_amount_exceeds_limit) = if self
             .capabilities
-            .contains(&Capability::HardLimits)
-            && sell_amount_limit < sell_amount
+            .contains(&Capability::HardLimits) &&
+            sell_amount_limit < sell_amount
         {
             (sell_amount_limit, true)
         } else {

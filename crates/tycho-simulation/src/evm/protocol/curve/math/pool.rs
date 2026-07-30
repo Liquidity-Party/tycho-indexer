@@ -188,16 +188,16 @@ impl Pool {
     /// Token balances in native units (wei).
     pub fn balances(&self) -> &[U256] {
         match self {
-            Pool::StableSwapV0 { balances, .. }
-            | Pool::StableSwapV1 { balances, .. }
-            | Pool::StableSwapV2 { balances, .. }
-            | Pool::StableSwapSTETH { balances, .. }
-            | Pool::StableSwapALend { balances, .. }
-            | Pool::StableSwapNG { balances, .. }
-            | Pool::StableSwapMeta { balances, .. } => balances,
-            Pool::TwoCryptoV1 { balances, .. }
-            | Pool::TwoCryptoNG { balances, .. }
-            | Pool::TwoCryptoStable { balances, .. } => balances,
+            Pool::StableSwapV0 { balances, .. } |
+            Pool::StableSwapV1 { balances, .. } |
+            Pool::StableSwapV2 { balances, .. } |
+            Pool::StableSwapSTETH { balances, .. } |
+            Pool::StableSwapALend { balances, .. } |
+            Pool::StableSwapNG { balances, .. } |
+            Pool::StableSwapMeta { balances, .. } => balances,
+            Pool::TwoCryptoV1 { balances, .. } |
+            Pool::TwoCryptoNG { balances, .. } |
+            Pool::TwoCryptoStable { balances, .. } => balances,
             Pool::TriCryptoV1 { balances, .. } | Pool::TriCryptoNG { balances, .. } => balances,
         }
     }
@@ -741,16 +741,16 @@ impl Pool {
     /// Amplification parameter (`amp` for StableSwap, `ann` for CryptoSwap).
     pub fn amp(&self) -> U256 {
         match self {
-            Pool::StableSwapV0 { amp, .. }
-            | Pool::StableSwapV1 { amp, .. }
-            | Pool::StableSwapV2 { amp, .. }
-            | Pool::StableSwapSTETH { amp, .. }
-            | Pool::StableSwapALend { amp, .. }
-            | Pool::StableSwapNG { amp, .. }
-            | Pool::StableSwapMeta { amp, .. } => *amp,
-            Pool::TwoCryptoV1 { ann, .. }
-            | Pool::TwoCryptoNG { ann, .. }
-            | Pool::TwoCryptoStable { ann, .. } => *ann,
+            Pool::StableSwapV0 { amp, .. } |
+            Pool::StableSwapV1 { amp, .. } |
+            Pool::StableSwapV2 { amp, .. } |
+            Pool::StableSwapSTETH { amp, .. } |
+            Pool::StableSwapALend { amp, .. } |
+            Pool::StableSwapNG { amp, .. } |
+            Pool::StableSwapMeta { amp, .. } => *amp,
+            Pool::TwoCryptoV1 { ann, .. } |
+            Pool::TwoCryptoNG { ann, .. } |
+            Pool::TwoCryptoStable { ann, .. } => *ann,
             Pool::TriCryptoV1 { ann, .. } | Pool::TriCryptoNG { ann, .. } => *ann,
         }
     }
@@ -758,13 +758,13 @@ impl Pool {
     /// Fee for StableSwap variants. Returns `None` for CryptoSwap.
     pub fn fee(&self) -> Option<U256> {
         match self {
-            Pool::StableSwapV0 { fee, .. }
-            | Pool::StableSwapV1 { fee, .. }
-            | Pool::StableSwapV2 { fee, .. }
-            | Pool::StableSwapSTETH { fee, .. }
-            | Pool::StableSwapALend { fee, .. }
-            | Pool::StableSwapNG { fee, .. }
-            | Pool::StableSwapMeta { fee, .. } => Some(*fee),
+            Pool::StableSwapV0 { fee, .. } |
+            Pool::StableSwapV1 { fee, .. } |
+            Pool::StableSwapV2 { fee, .. } |
+            Pool::StableSwapSTETH { fee, .. } |
+            Pool::StableSwapALend { fee, .. } |
+            Pool::StableSwapNG { fee, .. } |
+            Pool::StableSwapMeta { fee, .. } => Some(*fee),
             _ => None,
         }
     }
@@ -772,11 +772,11 @@ impl Pool {
     /// CryptoSwap fee parameters. Returns `None` for StableSwap.
     pub fn crypto_fees(&self) -> Option<(U256, U256, U256)> {
         match self {
-            Pool::TwoCryptoV1 { mid_fee, out_fee, fee_gamma, .. }
-            | Pool::TwoCryptoNG { mid_fee, out_fee, fee_gamma, .. }
-            | Pool::TwoCryptoStable { mid_fee, out_fee, fee_gamma, .. }
-            | Pool::TriCryptoV1 { mid_fee, out_fee, fee_gamma, .. }
-            | Pool::TriCryptoNG { mid_fee, out_fee, fee_gamma, .. } => {
+            Pool::TwoCryptoV1 { mid_fee, out_fee, fee_gamma, .. } |
+            Pool::TwoCryptoNG { mid_fee, out_fee, fee_gamma, .. } |
+            Pool::TwoCryptoStable { mid_fee, out_fee, fee_gamma, .. } |
+            Pool::TriCryptoV1 { mid_fee, out_fee, fee_gamma, .. } |
+            Pool::TriCryptoNG { mid_fee, out_fee, fee_gamma, .. } => {
                 Some((*mid_fee, *out_fee, *fee_gamma))
             }
             _ => None,
@@ -787,12 +787,12 @@ impl Pool {
     /// Returns `None` for ALend (uses precision_mul) and CryptoSwap.
     pub fn rates(&self) -> Option<&[U256]> {
         match self {
-            Pool::StableSwapV0 { rates, .. }
-            | Pool::StableSwapV1 { rates, .. }
-            | Pool::StableSwapV2 { rates, .. }
-            | Pool::StableSwapSTETH { rates, .. }
-            | Pool::StableSwapNG { rates, .. }
-            | Pool::StableSwapMeta { rates, .. } => Some(rates),
+            Pool::StableSwapV0 { rates, .. } |
+            Pool::StableSwapV1 { rates, .. } |
+            Pool::StableSwapV2 { rates, .. } |
+            Pool::StableSwapSTETH { rates, .. } |
+            Pool::StableSwapNG { rates, .. } |
+            Pool::StableSwapMeta { rates, .. } => Some(rates),
             _ => None,
         }
     }
@@ -800,9 +800,9 @@ impl Pool {
     /// Pool invariant D. Returns `None` for StableSwap (D is computed, not stored).
     pub fn d(&self) -> Option<U256> {
         match self {
-            Pool::TwoCryptoV1 { d, .. }
-            | Pool::TwoCryptoNG { d, .. }
-            | Pool::TwoCryptoStable { d, .. } => Some(*d),
+            Pool::TwoCryptoV1 { d, .. } |
+            Pool::TwoCryptoNG { d, .. } |
+            Pool::TwoCryptoStable { d, .. } => Some(*d),
             Pool::TriCryptoV1 { d, .. } | Pool::TriCryptoNG { d, .. } => Some(*d),
             _ => None,
         }
@@ -828,9 +828,9 @@ impl Pool {
     /// Precisions for CryptoSwap variants. Returns `None` for StableSwap.
     pub fn precisions(&self) -> Option<&[U256]> {
         match self {
-            Pool::TwoCryptoV1 { precisions, .. }
-            | Pool::TwoCryptoNG { precisions, .. }
-            | Pool::TwoCryptoStable { precisions, .. } => Some(precisions),
+            Pool::TwoCryptoV1 { precisions, .. } |
+            Pool::TwoCryptoNG { precisions, .. } |
+            Pool::TwoCryptoStable { precisions, .. } => Some(precisions),
             Pool::TriCryptoV1 { precisions, .. } | Pool::TriCryptoNG { precisions, .. } => {
                 Some(precisions)
             }
@@ -841,8 +841,8 @@ impl Pool {
     /// Offpeg fee multiplier. Returns `None` for variants without dynamic fee.
     pub fn offpeg_fee_multiplier(&self) -> Option<U256> {
         match self {
-            Pool::StableSwapNG { offpeg_fee_multiplier, .. }
-            | Pool::StableSwapALend { offpeg_fee_multiplier, .. } => Some(*offpeg_fee_multiplier),
+            Pool::StableSwapNG { offpeg_fee_multiplier, .. } |
+            Pool::StableSwapALend { offpeg_fee_multiplier, .. } => Some(*offpeg_fee_multiplier),
             _ => None,
         }
     }
@@ -850,9 +850,9 @@ impl Pool {
     /// Price scale(s). Returns `None` for StableSwap.
     pub fn price_scale(&self) -> Option<&[U256]> {
         match self {
-            Pool::TwoCryptoV1 { price_scale, .. }
-            | Pool::TwoCryptoNG { price_scale, .. }
-            | Pool::TwoCryptoStable { price_scale, .. } => std::slice::from_ref(price_scale).into(),
+            Pool::TwoCryptoV1 { price_scale, .. } |
+            Pool::TwoCryptoNG { price_scale, .. } |
+            Pool::TwoCryptoStable { price_scale, .. } => std::slice::from_ref(price_scale).into(),
             Pool::TriCryptoV1 { price_scale, .. } | Pool::TriCryptoNG { price_scale, .. } => {
                 Some(price_scale)
             }
@@ -863,16 +863,16 @@ impl Pool {
     /// Set balance for coin at `index`. **Per-block update.**
     pub fn set_balance(&mut self, index: usize, value: U256) -> Result<(), PoolError> {
         let bal = match self {
-            Pool::StableSwapV0 { balances, .. }
-            | Pool::StableSwapV1 { balances, .. }
-            | Pool::StableSwapV2 { balances, .. }
-            | Pool::StableSwapSTETH { balances, .. }
-            | Pool::StableSwapALend { balances, .. }
-            | Pool::StableSwapNG { balances, .. }
-            | Pool::StableSwapMeta { balances, .. } => balances.get_mut(index),
-            Pool::TwoCryptoV1 { balances, .. }
-            | Pool::TwoCryptoNG { balances, .. }
-            | Pool::TwoCryptoStable { balances, .. } => balances.get_mut(index),
+            Pool::StableSwapV0 { balances, .. } |
+            Pool::StableSwapV1 { balances, .. } |
+            Pool::StableSwapV2 { balances, .. } |
+            Pool::StableSwapSTETH { balances, .. } |
+            Pool::StableSwapALend { balances, .. } |
+            Pool::StableSwapNG { balances, .. } |
+            Pool::StableSwapMeta { balances, .. } => balances.get_mut(index),
+            Pool::TwoCryptoV1 { balances, .. } |
+            Pool::TwoCryptoNG { balances, .. } |
+            Pool::TwoCryptoStable { balances, .. } => balances.get_mut(index),
             Pool::TriCryptoV1 { balances, .. } | Pool::TriCryptoNG { balances, .. } => {
                 balances.get_mut(index)
             }
@@ -886,12 +886,12 @@ impl Pool {
     /// Applies to StableSwap variants with rates (V0/V1/V2/NG/Meta).
     pub fn set_rate(&mut self, index: usize, value: U256) -> Result<(), PoolError> {
         match self {
-            Pool::StableSwapV0 { rates, .. }
-            | Pool::StableSwapV1 { rates, .. }
-            | Pool::StableSwapV2 { rates, .. }
-            | Pool::StableSwapSTETH { rates, .. }
-            | Pool::StableSwapNG { rates, .. }
-            | Pool::StableSwapMeta { rates, .. } => {
+            Pool::StableSwapV0 { rates, .. } |
+            Pool::StableSwapV1 { rates, .. } |
+            Pool::StableSwapV2 { rates, .. } |
+            Pool::StableSwapSTETH { rates, .. } |
+            Pool::StableSwapNG { rates, .. } |
+            Pool::StableSwapMeta { rates, .. } => {
                 *rates
                     .get_mut(index)
                     .ok_or(PoolError::IndexOutOfRange)? = value;
@@ -904,9 +904,9 @@ impl Pool {
     /// Set pool invariant D. **Per-block update for CryptoSwap.**
     pub fn set_d(&mut self, value: U256) -> Result<(), PoolError> {
         match self {
-            Pool::TwoCryptoV1 { d, .. }
-            | Pool::TwoCryptoNG { d, .. }
-            | Pool::TwoCryptoStable { d, .. } => {
+            Pool::TwoCryptoV1 { d, .. } |
+            Pool::TwoCryptoNG { d, .. } |
+            Pool::TwoCryptoStable { d, .. } => {
                 *d = value;
                 Ok(())
             }
@@ -921,9 +921,9 @@ impl Pool {
     /// Set price_scale at `index`. **Per-block update for CryptoSwap.**
     pub fn set_price_scale(&mut self, index: usize, value: U256) -> Result<(), PoolError> {
         match self {
-            Pool::TwoCryptoV1 { price_scale, .. }
-            | Pool::TwoCryptoNG { price_scale, .. }
-            | Pool::TwoCryptoStable { price_scale, .. } => {
+            Pool::TwoCryptoV1 { price_scale, .. } |
+            Pool::TwoCryptoNG { price_scale, .. } |
+            Pool::TwoCryptoStable { price_scale, .. } => {
                 if index != 0 {
                     return Err(PoolError::IndexOutOfRange);
                 }
@@ -945,16 +945,16 @@ impl Pool {
     /// Applicable to all variants.
     pub fn set_amp(&mut self, value: U256) {
         match self {
-            Pool::StableSwapV0 { amp, .. }
-            | Pool::StableSwapV1 { amp, .. }
-            | Pool::StableSwapV2 { amp, .. }
-            | Pool::StableSwapSTETH { amp, .. }
-            | Pool::StableSwapALend { amp, .. }
-            | Pool::StableSwapNG { amp, .. }
-            | Pool::StableSwapMeta { amp, .. } => *amp = value,
-            Pool::TwoCryptoV1 { ann, .. }
-            | Pool::TwoCryptoNG { ann, .. }
-            | Pool::TwoCryptoStable { ann, .. } => *ann = value,
+            Pool::StableSwapV0 { amp, .. } |
+            Pool::StableSwapV1 { amp, .. } |
+            Pool::StableSwapV2 { amp, .. } |
+            Pool::StableSwapSTETH { amp, .. } |
+            Pool::StableSwapALend { amp, .. } |
+            Pool::StableSwapNG { amp, .. } |
+            Pool::StableSwapMeta { amp, .. } => *amp = value,
+            Pool::TwoCryptoV1 { ann, .. } |
+            Pool::TwoCryptoNG { ann, .. } |
+            Pool::TwoCryptoStable { ann, .. } => *ann = value,
             Pool::TriCryptoV1 { ann, .. } | Pool::TriCryptoNG { ann, .. } => *ann = value,
         }
     }

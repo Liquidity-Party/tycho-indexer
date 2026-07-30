@@ -39,8 +39,8 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RingSwapV2State {
         let reserves_inverted = static_attribute(&snapshot, "reserves_inverted")?
             .last()
             .copied()
-            .unwrap_or_default()
-            == 1;
+            .unwrap_or_default() ==
+            1;
 
         let (expected_component0, expected_component1) = if reserves_inverted {
             (underlying_token1, underlying_token0)

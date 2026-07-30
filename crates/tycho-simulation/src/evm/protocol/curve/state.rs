@@ -82,11 +82,11 @@ impl CurveState {
     fn is_crypto(&self) -> bool {
         matches!(
             self.variant,
-            CurveVariant::TwoCryptoV1
-                | CurveVariant::TwoCryptoNG
-                | CurveVariant::TwoCryptoStable
-                | CurveVariant::TriCryptoV1
-                | CurveVariant::TriCryptoNG
+            CurveVariant::TwoCryptoV1 |
+                CurveVariant::TwoCryptoNG |
+                CurveVariant::TwoCryptoStable |
+                CurveVariant::TriCryptoV1 |
+                CurveVariant::TriCryptoNG
         )
     }
 

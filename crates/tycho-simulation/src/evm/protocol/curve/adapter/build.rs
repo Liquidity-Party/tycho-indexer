@@ -398,11 +398,11 @@ pub fn build_pool(state: &RawPoolState) -> Result<Pool, BuildError> {
     }
 
     match state.variant {
-        CurveVariant::StableSwapV0
-        | CurveVariant::StableSwapV1
-        | CurveVariant::StableSwapV2
-        | CurveVariant::StableSwapSTETH
-        | CurveVariant::StableSwapMeta => build_stableswap_plain(state),
+        CurveVariant::StableSwapV0 |
+        CurveVariant::StableSwapV1 |
+        CurveVariant::StableSwapV2 |
+        CurveVariant::StableSwapSTETH |
+        CurveVariant::StableSwapMeta => build_stableswap_plain(state),
         CurveVariant::StableSwapNG => build_stableswap_ng(state),
         CurveVariant::StableSwapALend => build_stableswap_alend(state),
         CurveVariant::TwoCryptoV1 | CurveVariant::TwoCryptoNG | CurveVariant::TwoCryptoStable => {

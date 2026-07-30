@@ -277,8 +277,8 @@ fn quote_all(
         stats.quotes += 1;
         stats.distinct.insert(raw);
 
-        if force
-            || last_printed
+        if force ||
+            last_printed
                 .get(id)
                 .is_none_or(|last| last.display != display)
         {

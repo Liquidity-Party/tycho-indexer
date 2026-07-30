@@ -51,9 +51,7 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for RamsesV3State {
                     .parse::<i32>()
                 {
                     Ok(tick_index) => tick_index,
-                    Err(err) => {
-                        return Some(Err(InvalidSnapshotError::ValueError(err.to_string())))
-                    }
+                    Err(err) => return Some(Err(InvalidSnapshotError::ValueError(err.to_string()))),
                 };
 
                 let net_liquidity = i128::from(value.clone());
