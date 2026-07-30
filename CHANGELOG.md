@@ -1,3 +1,22 @@
+## [0.346.0](https://github.com/propeller-heads/tycho/compare/0.345.1...0.346.0) (2026-07-30)
+
+
+### Features
+
+* add Balancer V3 reClamm pool support (V3 factory) ([532a398](https://github.com/propeller-heads/tycho/commit/532a398d58d2917d88e4e39af02628fd6a713720))
+* add Balancer V3 reclamm pool types ([#1049](https://github.com/propeller-heads/tycho/issues/1049)) ([eae36de](https://github.com/propeller-heads/tycho/commit/eae36de52e17c11028d79b7e7140f60eecf419bf))
+* Add multi-network support for Balancer V3 ([c498939](https://github.com/propeller-heads/tycho/commit/c4989392cb0893b3959ba851481a344012e37c74))
+* **balancer-v3:** Add option to skip pools with rate providers ([2d17fdd](https://github.com/propeller-heads/tycho/commit/2d17fdd628b8a66ba8fa7d9600e7ea9fca6ba3a6))
+* **balancer-v3:** derive pool balances from vault storage diffs ([f04f0fb](https://github.com/propeller-heads/tycho/commit/f04f0fb1cd182a060a38ebaab464283de981ee53))
+* update set policy ([0d2a7a6](https://github.com/propeller-heads/tycho/commit/0d2a7a62d77bbfc47f50b564de62f0214e34e605))
+
+
+### Bug Fixes
+
+* **simulation:** refresh both balance maps in VM update_pool_state ([f773346](https://github.com/propeller-heads/tycho/commit/f773346a669c64a0c69dd315a33e1a49cbd43816))
+* substreams ci lint ([ceb011e](https://github.com/propeller-heads/tycho/commit/ceb011e53dbe27130f25c631cc9e8e3a6eff3e08))
+* **substreams:** remove manual_updates from balancer-v3 pools ([18ba7d7](https://github.com/propeller-heads/tycho/commit/18ba7d7f5dd3c7a7652ea45315a05b2fc5d4671e))
+
 ## [0.345.1](https://github.com/propeller-heads/tycho/compare/0.345.0...0.345.1) (2026-07-30)
 
 
