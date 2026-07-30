@@ -1,3 +1,11 @@
+## [0.345.1](https://github.com/propeller-heads/tycho/compare/0.345.0...0.345.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* publish spkg under the manifest name, not the source dir ([3159438](https://github.com/propeller-heads/tycho/commit/3159438116931d7464930624f20bec9f9758e6bc))
+* publish spkg under the manifest name, not the source dir ([#1253](https://github.com/propeller-heads/tycho/issues/1253)) ([eb93c14](https://github.com/propeller-heads/tycho/commit/eb93c149873fc388e7e04152247ff1c2510e1484))
+
 ## [0.345.0](https://github.com/propeller-heads/tycho/compare/0.344.0...0.345.0) (2026-07-30)
 
 
