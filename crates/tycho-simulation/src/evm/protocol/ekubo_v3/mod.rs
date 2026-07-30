@@ -11,6 +11,12 @@ pub mod state;
 #[cfg(test)]
 mod test_cases;
 
+/// Extension contracts that gate swaps behind off-chain authorization. A component carrying one
+/// of these in its `extension` static attribute is exclusive.
+///
+/// Used by Fynd to filter exclusive components out of public-only routing graphs.
+pub const EXCLUSIVE_EXTENSIONS: &[Address] = &[addresses::SIGNED_EXCLUSIVE_SWAP_ADDRESS];
+
 /// The extension type of `component`, or `None` if the extension attribute is missing, malformed,
 /// or unsupported.
 fn component_extension_type(component: &ComponentWithState) -> Option<ExtensionType> {
@@ -117,7 +123,7 @@ mod tests {
     /// see exactly the components the inclusive filter let through.
     #[test]
     fn exclusive_extensions_consistent_with_filters() {
-        for extension in crate::evm::protocol::EXCLUSIVE_EXTENSIONS {
+        for extension in EXCLUSIVE_EXTENSIONS {
             let component = with_extension(*extension);
 
             assert!(!filter_fn(&component));

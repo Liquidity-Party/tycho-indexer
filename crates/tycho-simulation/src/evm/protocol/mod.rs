@@ -1,5 +1,3 @@
-use revm::primitives::Address;
-
 pub mod aerodrome_slipstreams;
 pub mod aerodrome_v1;
 mod clmm;
@@ -26,12 +24,6 @@ pub mod uniswap_v4;
 pub mod utils;
 pub mod velodrome_slipstreams;
 pub mod vm;
-
-/// Extension contracts that gate swaps behind off-chain authorization. A component carrying one
-/// of these in its `extension` static attribute is exclusive, whatever its protocol.
-///
-/// Used by Fynd to filter exclusive components out of public-only routing graphs.
-pub const EXCLUSIVE_EXTENSIONS: &[Address] = &[ekubo_v3::addresses::SIGNED_EXCLUSIVE_SWAP_ADDRESS];
 
 #[cfg(test)]
 mod test_utils {

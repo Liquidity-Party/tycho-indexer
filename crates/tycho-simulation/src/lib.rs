@@ -22,8 +22,6 @@ pub use tycho_ethereum;
 
 #[cfg(feature = "evm")]
 pub mod evm;
-#[cfg(feature = "evm")]
-pub use evm::protocol::EXCLUSIVE_EXTENSIONS;
 pub mod protocol;
 #[cfg(feature = "rfq")]
 pub mod rfq;
