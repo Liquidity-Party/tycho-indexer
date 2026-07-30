@@ -168,12 +168,13 @@ impl EkuboPool for TwammPool {
         let moved_to_unfavorable_price = (virtual_order_quote
             .state_after
             .full_range_pool_state
-            .sqrt_ratio <
-            self.swap_state
+            .sqrt_ratio
+            < self
+                .swap_state
                 .sdk_state
                 .full_range_pool_state
-                .sqrt_ratio) ==
-            (token_in == key.token0);
+                .sqrt_ratio)
+            == (token_in == key.token0);
 
         let (override_state, meta) = if moved_to_unfavorable_price {
             (
@@ -252,9 +253,9 @@ impl EkuboPool for TwammPool {
 
 impl PartialEq for TwammPool {
     fn eq(&self, &Self { ref imp, swap_state }: &Self) -> bool {
-        self.imp.key() == imp.key() &&
-            self.imp.sale_rate_deltas() == imp.sale_rate_deltas() &&
-            self.swap_state == swap_state
+        self.imp.key() == imp.key()
+            && self.imp.sale_rate_deltas() == imp.sale_rate_deltas()
+            && self.swap_state == swap_state
     }
 }
 
@@ -269,10 +270,10 @@ fn gas_costs(
             },
     }: EvmTwammPoolResources,
 ) -> u64 {
-    full_range::gas_costs(full_range) +
-        EXTRA_BASE_GAS_COST +
-        u64::from(virtual_orders_executed) * GAS_COST_OF_EXECUTING_VIRTUAL_ORDERS +
-        u64::from(virtual_order_delta_times_crossed) *
-            GAS_COST_OF_CROSSING_ONE_VIRTUAL_ORDER_DELTA +
-        u64::from(extra_distinct_bitmap_lookups) * GAS_COST_OF_ONE_BITMAP_SLOAD
+    full_range::gas_costs(full_range)
+        + EXTRA_BASE_GAS_COST
+        + u64::from(virtual_orders_executed) * GAS_COST_OF_EXECUTING_VIRTUAL_ORDERS
+        + u64::from(virtual_order_delta_times_crossed)
+            * GAS_COST_OF_CROSSING_ONE_VIRTUAL_ORDER_DELTA
+        + u64::from(extra_distinct_bitmap_lookups) * GAS_COST_OF_ONE_BITMAP_SLOAD
 }

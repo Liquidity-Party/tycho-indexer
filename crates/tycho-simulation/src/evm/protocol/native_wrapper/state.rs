@@ -55,9 +55,9 @@ impl NativeWrapperState {
     }
 
     fn validate_tokens(&self, token_in: &Bytes, token_out: &Bytes) -> Result<(), SimulationError> {
-        let valid_pair = (*token_in == self.native_token.address &&
-            *token_out == self.wrapped_token.address) ||
-            (*token_in == self.wrapped_token.address && *token_out == self.native_token.address);
+        let valid_pair = (*token_in == self.native_token.address
+            && *token_out == self.wrapped_token.address)
+            || (*token_in == self.wrapped_token.address && *token_out == self.native_token.address);
         if !valid_pair {
             return Err(SimulationError::InvalidInput(
                 format!(

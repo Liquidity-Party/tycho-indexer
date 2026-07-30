@@ -146,6 +146,6 @@ fn gas_costs(
         oracle: OracleStandalonePoolResources { snapshots_written },
     }: EvmOraclePoolResources,
 ) -> u64 {
-    full_range::gas_costs(full_range) - REDUCED_BASE_GAS_COST +
-        u64::from(snapshots_written) * GAS_COST_OF_UPDATING_SNAPSHOT
+    full_range::gas_costs(full_range) - REDUCED_BASE_GAS_COST
+        + u64::from(snapshots_written) * GAS_COST_OF_UPDATING_SNAPSHOT
 }

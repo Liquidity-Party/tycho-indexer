@@ -135,8 +135,8 @@ pub fn get_amount_in(
     xp_after[j] = y;
     let fee_actual = crypto_fee(&xp_after, mid_fee, out_fee, fee_gamma)?;
     let complement_actual = fee_denom - fee_actual;
-    let dy_native = (desired_output.checked_mul(fee_denom)? + complement_actual - U256::from(1)) /
-        complement_actual;
+    let dy_native = (desired_output.checked_mul(fee_denom)? + complement_actual - U256::from(1))
+        / complement_actual;
     let dy_internal = if j > 0 {
         (dy_native.checked_mul(price_scale_local)? + wad - U256::from(1)) / wad
     } else {

@@ -47,11 +47,11 @@ impl StableswapPool {
     }
 
     pub(super) fn gas_costs() -> u64 {
-        START_PAYMENT_GAS_COST +
-            BASE_SWAP_GAS_COST +
-            WITHDRAW_GAS_COST +
-            COMPLETE_PAYMENT_GAS_COST +
-            TRANSFER_FROM_USER_GAS_COST
+        START_PAYMENT_GAS_COST
+            + BASE_SWAP_GAS_COST
+            + WITHDRAW_GAS_COST
+            + COMPLETE_PAYMENT_GAS_COST
+            + TRANSFER_FROM_USER_GAS_COST
     }
 }
 

@@ -96,8 +96,8 @@ impl LiquoriceClient {
         for approved_quote_token in &self.quote_tokens {
             for token_prices in prices_by_mm.values() {
                 for token_price in token_prices {
-                    if token_price.base_token == quote_token &&
-                        token_price.quote_token == *approved_quote_token
+                    if token_price.base_token == quote_token
+                        && token_price.quote_token == *approved_quote_token
                     {
                         if let Some(price) = token_price.get_price_for_amount(1.0) {
                             return Ok(raw_tvl * price);
@@ -405,8 +405,8 @@ impl RFQClient for LiquoriceClient {
         let expiry = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|_| RFQError::ParsingError("SystemTime before UNIX EPOCH!".into()))?
-            .as_secs() +
-            self.quote_expiry_secs;
+            .as_secs()
+            + self.quote_expiry_secs;
 
         let rfq_id = uuid::Uuid::new_v4().to_string();
 

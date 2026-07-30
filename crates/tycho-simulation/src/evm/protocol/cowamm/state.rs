@@ -456,7 +456,10 @@ impl ProtocolSim for CowAMMState {
     ) -> Result<GetAmountOutResult, SimulationError> {
         let amount_in = biguint_to_u256(&amount_in);
         if amount_in.is_zero() {
-            return Err(SimulationError::InvalidInput("Amount in cannot be zero".to_string(), None));
+            return Err(SimulationError::InvalidInput(
+                "Amount in cannot be zero".to_string(),
+                None,
+            ));
         }
 
         let is_lp_in = token_in.address == self.address;

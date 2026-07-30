@@ -151,8 +151,8 @@ pub fn newton_y_3(ann: U256, gamma: U256, x: [U256; 3], d: U256, j: usize) -> Op
         .iter()
         .max()
         .copied()
-        .unwrap_or(U256::ZERO) /
-        U256::from(10u128.pow(14)))
+        .unwrap_or(U256::ZERO)
+        / U256::from(10u128.pow(14)))
     .max(d / U256::from(10u128.pow(14)))
     .max(U256::from(100u64));
     let __g1k0 = gamma + WAD;
@@ -214,14 +214,15 @@ pub fn get_y_3_ng(ann: U256, gamma: U256, x: [U256; 3], d: U256, i: usize) -> Op
     let e18 = I256::try_from(WAD).expect("WAD fits I256");
     let a_mul_s = I256::try_from(A_MULTIPLIER).expect("A_MULTIPLIER fits I256");
     let a: I256 = si(36) / s(27);
-    let b: I256 = si(36) / s(9) +
-        s(2).wrapping_mul(e18)
-            .wrapping_mul(gamma_s) /
-            s(27) -
-        d_s.wrapping_mul(d_s) / x_j * gamma2 * ann_s / s(27 * 27) / a_mul_s / x_k;
-    let c: I256 = si(36) / s(9) +
-        gamma_s.wrapping_mul(gamma_s + s(4).wrapping_mul(e18)) / s(27) +
-        gamma2 * (x_j + x_k - d_s) / d_s * ann_s / s(27) / a_mul_s;
+    let b: I256 = si(36) / s(9)
+        + s(2)
+            .wrapping_mul(e18)
+            .wrapping_mul(gamma_s)
+            / s(27)
+        - d_s.wrapping_mul(d_s) / x_j * gamma2 * ann_s / s(27 * 27) / a_mul_s / x_k;
+    let c: I256 = si(36) / s(9)
+        + gamma_s.wrapping_mul(gamma_s + s(4).wrapping_mul(e18)) / s(27)
+        + gamma2 * (x_j + x_k - d_s) / d_s * ann_s / s(27) / a_mul_s;
     let d_coeff: I256 = (e18 + gamma_s).wrapping_mul(e18 + gamma_s) / s(27);
     let d0: I256 = (s(3).wrapping_mul(a).wrapping_mul(c) / b - b).abs();
     let d0_u = U256::try_from(d0).unwrap_or(U256::ZERO);
@@ -258,9 +259,9 @@ pub fn get_y_3_ng(ann: U256, gamma: U256, x: [U256; 3], d: U256, i: usize) -> Op
     };
     let _3ac = s(3).wrapping_mul(a).wrapping_mul(c);
     let delta0 = _3ac / b - b;
-    let delta1 = s(3).wrapping_mul(_3ac) / b -
-        s(2).wrapping_mul(b) -
-        s(27).wrapping_mul(a.wrapping_mul(a)) / b * d_coeff / b;
+    let delta1 = s(3).wrapping_mul(_3ac) / b
+        - s(2).wrapping_mul(b)
+        - s(27).wrapping_mul(a.wrapping_mul(a)) / b * d_coeff / b;
     let sqrt_arg =
         delta1.wrapping_mul(delta1) + s(4).wrapping_mul(delta0.wrapping_mul(delta0)) / b * delta0;
     if sqrt_arg <= I256::ZERO {

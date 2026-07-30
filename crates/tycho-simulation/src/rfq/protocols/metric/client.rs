@@ -338,8 +338,8 @@ impl MetricClient {
         params: &GetAmountOutParams,
         amount_out: BigUint,
     ) -> Result<SignedQuote, RFQError> {
-        if !((params.token_in == metadata.token0 && params.token_out == metadata.token1) ||
-            (params.token_in == metadata.token1 && params.token_out == metadata.token0))
+        if !((params.token_in == metadata.token0 && params.token_out == metadata.token1)
+            || (params.token_in == metadata.token1 && params.token_out == metadata.token0))
         {
             return Err(RFQError::InvalidInput(format!(
                 "Metric token pair mismatch: {} -> {} is not {} / {}",
@@ -476,8 +476,8 @@ impl RFQClient for MetricClient {
         let pool = metadata
             .iter()
             .find(|pool| {
-                (params.token_in == pool.token0 && params.token_out == pool.token1) ||
-                    (params.token_in == pool.token1 && params.token_out == pool.token0)
+                (params.token_in == pool.token0 && params.token_out == pool.token1)
+                    || (params.token_in == pool.token1 && params.token_out == pool.token0)
             })
             .ok_or_else(|| {
                 RFQError::QuoteNotFound(format!(
@@ -580,11 +580,12 @@ fn metric_price_in_quote_token(
 
         // Multiple Metric pools can price the same token in a configured quote token. Use the
         // pool with the largest quote-side availability as the most liquid pricing source.
-        if price.is_finite() &&
-            price > 0.0 &&
-            quote_tvl.is_finite() &&
-            quote_tvl > 0.0 &&
-            best.as_ref()
+        if price.is_finite()
+            && price > 0.0
+            && quote_tvl.is_finite()
+            && quote_tvl > 0.0
+            && best
+                .as_ref()
                 .is_none_or(|(_, best_quote_tvl)| quote_tvl > *best_quote_tvl)
         {
             best = Some((price, quote_tvl));
@@ -861,9 +862,9 @@ mod tests {
                 .await
             {
                 Ok(bid_ask) => {
-                    if bid_ask.quote_available &&
-                        !bid_ask.depth.asks.is_empty() &&
-                        !bid_ask.depth.bids.is_empty()
+                    if bid_ask.quote_available
+                        && !bid_ask.depth.asks.is_empty()
+                        && !bid_ask.depth.bids.is_empty()
                     {
                         selected = Some((pool, bid_ask));
                         break;

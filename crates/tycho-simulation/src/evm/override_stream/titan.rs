@@ -510,8 +510,8 @@ impl TitanProvider {
             .and_then(|offset| BEACON_GENESIS_TIMESTAMP.checked_add(offset))?;
         match wall_clock {
             Some(now)
-                if !(now.saturating_sub(SECONDS_PER_SLOT)..=
-                    now.saturating_add(MAX_LANE_TIMESTAMP_LEAD_SECS))
+                if !(now.saturating_sub(SECONDS_PER_SLOT)
+                    ..=now.saturating_add(MAX_LANE_TIMESTAMP_LEAD_SECS))
                     .contains(&derived) =>
             {
                 None

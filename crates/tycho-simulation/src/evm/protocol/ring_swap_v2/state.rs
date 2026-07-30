@@ -227,8 +227,8 @@ impl ProtocolSim for RingSwapV2State {
     ) -> Result<(), TransitionError> {
         if delta
             .updated_attributes
-            .contains_key("reserve0") ||
-            delta
+            .contains_key("reserve0")
+            || delta
                 .updated_attributes
                 .contains_key("reserve1")
         {

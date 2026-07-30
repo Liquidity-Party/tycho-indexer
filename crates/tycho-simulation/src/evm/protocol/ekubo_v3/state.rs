@@ -35,28 +35,9 @@ use crate::evm::protocol::{
     u256_num::u256_to_f64,
 };
 
-/// Extra gas a swap on a `SignedExclusiveSwap` pool costs over the same swap on a plain pool.
+/// Gas cost of `Core.forward` plus the signature check, on top of the swap itself.
 ///
-/// The extension reverts in `beforeSwap`, so every swap on such a pool must go through
-/// `Core.forward`, carrying an EIP-712 signature that the extension recovers and a nonce it writes.
-/// The concentrated math this state simulates is the same either way, so the difference is pure
-/// execution overhead the curve knows nothing about.
-///
-/// Measured in Ekubo's own harness (`test/extensions/SignedExclusiveSwap.t.sol`, `--isolate`, cold
-/// storage), with one plain-swap baseline added alongside the existing signed cases so the lock,
-/// settle path, fee, tick spacing, position and swap amount are identical on both sides:
-///
-/// | case                              |    gas |
-/// |-----------------------------------|--------|
-/// | plain swap, no extension          | 81_139 |
-/// | signed swap, zero signed fee      | 118_991 |
-/// | signed swap, non-zero signed fee  | 143_512 |
-///
-/// That puts `forward` plus the signature check at 37_852 and the extension's fee accounting into
-/// Core's saved balances at a further 24_521. The non-zero-fee figure is the one used: Fynd signs
-/// whatever fee it takes to underbid, which is normally above zero, and erring high is the safe
-/// direction — understating this gas makes an exclusive route look better than it is and lowers the
-/// amount the taker is committed to.
+/// Measured against a plain-swap baseline in Ekubo's `SignedExclusiveSwap.t.sol`.
 const SIGNED_EXCLUSIVE_SWAP_GAS: u64 = 62_373;
 
 #[enum_delegate::implement(EkuboPool)]
@@ -82,8 +63,7 @@ fn sqrt_price_q128_to_f64(
 }
 
 impl EkuboV3State {
-    /// Gas this pool needs beyond its swap math, because its extension forces the swap through
-    /// `Core.forward` with a signature. Zero for every other pool.
+    /// Zero unless the extension forces the swap through `Core.forward`.
     fn forward_overhead_gas(&self) -> u64 {
         if self.key().config.extension == SIGNED_EXCLUSIVE_SWAP_ADDRESS {
             SIGNED_EXCLUSIVE_SWAP_GAS
@@ -231,9 +211,7 @@ mod tests {
     use super::*;
     use crate::evm::protocol::ekubo_v3::test_cases::*;
 
-    /// A signed-exclusive pool reports its swap math plus the forward overhead; the same swap on a
-    /// plain concentrated pool reports the math alone. Both pools price identically, so the gap is
-    /// exactly the constant — this is what stops an exclusive route being costed as a direct swap.
+    /// Both pools price identically, so the gas gap is exactly the forward overhead.
     #[rstest]
     fn test_signed_exclusive_swap_gas_includes_the_forward_overhead() {
         let signed = signed_exclusive_swap();
@@ -260,8 +238,7 @@ mod tests {
         );
     }
 
-    /// Every other extension leaves the simulated gas alone: the surcharge is specific to the pool
-    /// type that cannot be swapped without `Core.forward`.
+    /// Only a pool that cannot be swapped without `Core.forward` is surcharged.
     #[rstest]
     fn test_other_pools_carry_no_forward_overhead() {
         for case in [concentrated(), full_range(), mev_capture()] {

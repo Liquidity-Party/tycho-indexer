@@ -83,7 +83,9 @@ pub(super) fn get_next_sqrt_price_from_input(
     zero_for_one: bool,
 ) -> Result<U256, SimulationError> {
     if sqrt_price == U256::ZERO {
-        return Err(SimulationError::FatalError("sqrt_price must be greater than zero".to_string()));
+        return Err(SimulationError::FatalError(
+            "sqrt_price must be greater than zero".to_string(),
+        ));
     }
 
     if zero_for_one {
@@ -100,7 +102,9 @@ pub(super) fn get_next_sqrt_price_from_output(
     zero_for_one: bool,
 ) -> Result<U256, SimulationError> {
     if sqrt_price == U256::ZERO {
-        return Err(SimulationError::FatalError("sqrt_price must be greater than zero".to_string()));
+        return Err(SimulationError::FatalError(
+            "sqrt_price must be greater than zero".to_string(),
+        ));
     }
     if liquidity == 0 {
         return Err(SimulationError::FatalError("liquidity must be greater than zero".to_string()));

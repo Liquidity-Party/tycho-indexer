@@ -43,8 +43,8 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for AerodromeV1State {
             .static_attributes
             .get("is_stable")
             .ok_or(InvalidSnapshotError::MissingAttribute("is_stable".to_string()))?
-            .first() ==
-            Some(&1);
+            .first()
+            == Some(&1);
 
         let fee = snapshot
             .state

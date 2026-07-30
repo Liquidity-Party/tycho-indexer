@@ -39,12 +39,12 @@ pub fn get_amount_out(
         bal[0].checked_mul(precisions[0])?,
         bal[1]
             .checked_mul(price_scale[0])?
-            .checked_mul(precisions[1])? /
-            wad,
+            .checked_mul(precisions[1])?
+            / wad,
         bal[2]
             .checked_mul(price_scale[1])?
-            .checked_mul(precisions[2])? /
-            wad,
+            .checked_mul(precisions[2])?
+            / wad,
     ];
 
     // NG uses hybrid cubic+Newton solver
@@ -132,8 +132,8 @@ pub fn get_amount_in(
     xp_after[j] = y;
     let fee_actual = crypto_fee(&xp_after, mid_fee, out_fee, fee_gamma)?;
     let complement_actual = fee_denom - fee_actual;
-    let dy_native = (desired_output.checked_mul(fee_denom)? + complement_actual - U256::from(1)) /
-        complement_actual;
+    let dy_native = (desired_output.checked_mul(fee_denom)? + complement_actual - U256::from(1))
+        / complement_actual;
     let mut dy_internal = dy_native.checked_mul(precisions[j])?;
     if j > 0 {
         dy_internal = (dy_internal.checked_mul(price_scale[j - 1])? + wad - U256::from(1)) / wad;

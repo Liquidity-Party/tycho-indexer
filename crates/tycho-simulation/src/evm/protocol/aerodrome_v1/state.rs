@@ -102,7 +102,10 @@ impl AerodromeV1State {
         reserve_out: U256,
     ) -> Result<U256, SimulationError> {
         if amount_in == U256::ZERO {
-            return Err(SimulationError::InvalidInput("Amount in cannot be zero".to_string(), None));
+            return Err(SimulationError::InvalidInput(
+                "Amount in cannot be zero".to_string(),
+                None,
+            ));
         }
 
         if reserve_in == U256::ZERO || reserve_out == U256::ZERO {
@@ -275,12 +278,12 @@ impl ProtocolSim for AerodromeV1State {
 
     fn eq(&self, other: &dyn ProtocolSim) -> bool {
         if let Some(other_state) = other.as_any().downcast_ref::<Self>() {
-            self.reserve0 == other_state.reserve0 &&
-                self.reserve1 == other_state.reserve1 &&
-                self.stable == other_state.stable &&
-                self.fee == other_state.fee &&
-                self.decimals0 == other_state.decimals0 &&
-                self.decimals1 == other_state.decimals1
+            self.reserve0 == other_state.reserve0
+                && self.reserve1 == other_state.reserve1
+                && self.stable == other_state.stable
+                && self.fee == other_state.fee
+                && self.decimals0 == other_state.decimals0
+                && self.decimals1 == other_state.decimals1
         } else {
             false
         }

@@ -189,8 +189,9 @@ impl RocketpoolState {
     /// The minimum of these three gives the number of entries assigned.
     /// Total ETH assigned = entries × 32 ETH.
     fn calculate_assign_deposits(&self, deposit_amount: U256) -> (U256, u64) {
-        if !self.deposit_assigning_enabled ||
-            self.megapool_queue_requested_total
+        if !self.deposit_assigning_enabled
+            || self
+                .megapool_queue_requested_total
                 .is_zero()
         {
             return (U256::ZERO, 0);

@@ -33,8 +33,8 @@ pub fn newton_y_3(ann: U256, gamma: U256, x: [U256; 3], d: U256, j: usize) -> Op
         .iter()
         .max()
         .copied()
-        .unwrap_or(U256::ZERO) /
-        U256::from(10u128.pow(14)))
+        .unwrap_or(U256::ZERO)
+        / U256::from(10u128.pow(14)))
     .max(d / U256::from(10u128.pow(14)))
     .max(U256::from(100u64));
     let __g1k0 = gamma + WAD;

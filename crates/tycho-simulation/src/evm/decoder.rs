@@ -119,9 +119,9 @@ where
 /// decoder. Returns true when `vm:curve` is registered with any other type — i.e. the deprecated
 /// VM-adapter path, still supported for a few releases before removal.
 fn is_deprecated_curve_registration<T: 'static>(exchange: &str) -> bool {
-    exchange == "vm:curve" &&
-        std::any::type_name::<T>() !=
-            std::any::type_name::<crate::evm::protocol::curve::CurveState>()
+    exchange == "vm:curve"
+        && std::any::type_name::<T>()
+            != std::any::type_name::<crate::evm::protocol::curve::CurveState>()
 }
 
 impl<H> TychoStreamDecoder<H>
@@ -306,8 +306,8 @@ where
                     .new_tokens
                     .iter()
                     .filter(|(addr, t)| {
-                        t.quality >= self.min_token_quality &&
-                            !state_guard.tokens.contains_key(*addr)
+                        t.quality >= self.min_token_quality
+                            && !state_guard.tokens.contains_key(*addr)
                     })
                     .map(|(addr, t)| (addr.clone(), t.clone()))
                     .collect::<HashMap<Bytes, Token>>();

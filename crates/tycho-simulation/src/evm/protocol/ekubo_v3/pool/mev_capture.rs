@@ -162,17 +162,18 @@ impl EkuboPool for MevCapturePool {
 
 impl PartialEq for MevCapturePool {
     fn eq(&self, &Self { ref imp, swap_state }: &Self) -> bool {
-        self.imp.key() == imp.key() &&
-            self.imp.concentrated_pool().ticks() == imp.concentrated_pool().ticks() &&
-            self.swap_state == swap_state
+        self.imp.key() == imp.key()
+            && self.imp.concentrated_pool().ticks() == imp.concentrated_pool().ticks()
+            && self.swap_state == swap_state
     }
 }
 
 impl PartialEq for MevCapturePoolSwapState {
     fn eq(&self, &Self { last_tick, active_tick, sdk_state }: &Self) -> bool {
-        self.sdk_state == sdk_state &&
-            self.last_tick == last_tick &&
-            self.active_tick
+        self.sdk_state == sdk_state
+            && self.last_tick == last_tick
+            && self
+                .active_tick
                 .zip(active_tick)
                 .is_none_or(|(t1, t2)| t1 == t2)
     }
@@ -199,7 +200,7 @@ fn gas_costs(
         mev_capture: MevCaptureStandalonePoolResources { state_update_count },
     }: EvmMevCapturePoolResources,
 ) -> u64 {
-    concentrated::gas_costs(concentrated) +
-        EXTRA_BASE_GAS_COST +
-        u64::from(state_update_count) * GAS_COST_OF_ONE_STATE_UPDATE
+    concentrated::gas_costs(concentrated)
+        + EXTRA_BASE_GAS_COST
+        + u64::from(state_update_count) * GAS_COST_OF_ONE_STATE_UPDATE
 }

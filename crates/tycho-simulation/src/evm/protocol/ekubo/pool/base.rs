@@ -34,9 +34,9 @@ pub struct BasePool {
 
 impl PartialEq for BasePool {
     fn eq(&self, other: &Self) -> bool {
-        self.key() == other.key() &&
-            self.imp.get_sorted_ticks() == other.imp.get_sorted_ticks() &&
-            self.state == other.state
+        self.key() == other.key()
+            && self.imp.get_sorted_ticks() == other.imp.get_sorted_ticks()
+            && self.state == other.state
     }
 }
 
@@ -79,9 +79,9 @@ impl BasePool {
     }
 
     pub(super) fn gas_costs(resources: BasePoolResources) -> u64 {
-        u64::from(resources.tick_spacings_crossed) * Self::GAS_COST_OF_ONE_TICK_SPACING_CROSSED +
-            u64::from(resources.initialized_ticks_crossed) *
-                Self::GAS_COST_OF_ONE_INITIALIZED_TICK_CROSSED
+        u64::from(resources.tick_spacings_crossed) * Self::GAS_COST_OF_ONE_TICK_SPACING_CROSSED
+            + u64::from(resources.initialized_ticks_crossed)
+                * Self::GAS_COST_OF_ONE_INITIALIZED_TICK_CROSSED
     }
 }
 
@@ -121,10 +121,10 @@ impl EkuboPool for BasePool {
         Ok(EkuboPoolQuote {
             consumed_amount: quote.consumed_amount,
             calculated_amount: quote.calculated_amount,
-            gas: Self::BASE_SWAP_GAS_COST +
-                Self::PAY_METHOD_GAS_COST +
-                Self::WITHDRAW_METHOD_GAS_COST +
-                Self::gas_costs(quote.execution_resources),
+            gas: Self::BASE_SWAP_GAS_COST
+                + Self::PAY_METHOD_GAS_COST
+                + Self::WITHDRAW_METHOD_GAS_COST
+                + Self::gas_costs(quote.execution_resources),
             new_state,
         })
     }
@@ -260,10 +260,10 @@ where
     Ok(quote
         .consumed_amount
         .saturating_sub(
-            WEI_UNDERESTIMATION_FACTOR *
-                (i128::from(resources.initialized_ticks_crossed) +
-                    i128::from(resources.tick_spacings_crossed) / 256 +
-                    1),
+            WEI_UNDERESTIMATION_FACTOR
+                * (i128::from(resources.initialized_ticks_crossed)
+                    + i128::from(resources.tick_spacings_crossed) / 256
+                    + 1),
         )
         .max(0))
 }

@@ -146,16 +146,17 @@ impl EkuboPool for ConcentratedPool {
 
 impl PartialEq for ConcentratedPool {
     fn eq(&self, &Self { ref imp, swap_state }: &Self) -> bool {
-        self.imp.key() == imp.key() &&
-            self.imp.ticks() == imp.ticks() &&
-            self.swap_state == swap_state
+        self.imp.key() == imp.key()
+            && self.imp.ticks() == imp.ticks()
+            && self.swap_state == swap_state
     }
 }
 
 impl PartialEq for ConcentratedPoolSwapState {
     fn eq(&self, &Self { sdk_state, active_tick }: &Self) -> bool {
-        self.sdk_state == sdk_state &&
-            self.active_tick
+        self.sdk_state == sdk_state
+            && self
+                .active_tick
                 .zip(active_tick)
                 .is_none_or(|(t1, t2)| t1 == t2)
     }
@@ -179,15 +180,15 @@ pub(super) fn gas_costs(
     let (extra_distinct_bitmap_lookups, initialized_ticks_crossed) =
         (u64::from(extra_distinct_bitmap_lookups), u64::from(initialized_ticks_crossed));
 
-    START_PAYMENT_GAS_COST +
-        BASE_SWAP_GAS_COST +
-        WITHDRAW_GAS_COST +
-        COMPLETE_PAYMENT_GAS_COST +
-        TRANSFER_FROM_USER_GAS_COST +
-        extra_distinct_bitmap_lookups * GAS_COST_OF_ONE_EXTRA_TICK_BITMAP_SLOAD +
-        initialized_ticks_crossed * GAS_COST_OF_ONE_INITIALIZED_TICK_CROSSED +
-        (initialized_ticks_crossed + extra_distinct_bitmap_lookups) *
-            GAS_COST_OF_ONE_EXTRA_MATH_ROUND
+    START_PAYMENT_GAS_COST
+        + BASE_SWAP_GAS_COST
+        + WITHDRAW_GAS_COST
+        + COMPLETE_PAYMENT_GAS_COST
+        + TRANSFER_FROM_USER_GAS_COST
+        + extra_distinct_bitmap_lookups * GAS_COST_OF_ONE_EXTRA_TICK_BITMAP_SLOAD
+        + initialized_ticks_crossed * GAS_COST_OF_ONE_INITIALIZED_TICK_CROSSED
+        + (initialized_ticks_crossed + extra_distinct_bitmap_lookups)
+            * GAS_COST_OF_ONE_EXTRA_MATH_ROUND
 }
 
 pub(super) fn get_limit<P, S, M, R>(
@@ -239,10 +240,10 @@ where
     Ok(quote
         .consumed_amount
         .saturating_sub(
-            WEI_UNDERESTIMATION_FACTOR *
-                (i128::from(resources.initialized_ticks_crossed) +
-                    i128::from(resources.extra_distinct_bitmap_lookups) +
-                    1),
+            WEI_UNDERESTIMATION_FACTOR
+                * (i128::from(resources.initialized_ticks_crossed)
+                    + i128::from(resources.extra_distinct_bitmap_lookups)
+                    + 1),
         )
         .max(0))
 }

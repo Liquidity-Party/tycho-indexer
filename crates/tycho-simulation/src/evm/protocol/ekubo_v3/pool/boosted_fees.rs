@@ -231,10 +231,10 @@ impl EkuboPool for BoostedFeesPool {
 
 impl PartialEq for BoostedFeesPool {
     fn eq(&self, &Self { ref imp, swap_state }: &Self) -> bool {
-        self.imp.key() == imp.key() &&
-            self.imp.donate_rate_deltas() == imp.donate_rate_deltas() &&
-            self.imp.concentrated_pool().ticks() == imp.concentrated_pool().ticks() &&
-            self.swap_state == swap_state
+        self.imp.key() == imp.key()
+            && self.imp.donate_rate_deltas() == imp.donate_rate_deltas()
+            && self.imp.concentrated_pool().ticks() == imp.concentrated_pool().ticks()
+            && self.swap_state == swap_state
     }
 }
 
@@ -243,10 +243,11 @@ impl PartialEq for BoostedFeesPoolSwapState {
         &self,
         &Self { sdk_state, swapped_this_block, last_real_time, active_tick }: &Self,
     ) -> bool {
-        self.sdk_state == sdk_state &&
-            self.swapped_this_block == swapped_this_block &&
-            self.last_real_time == last_real_time &&
-            self.active_tick
+        self.sdk_state == sdk_state
+            && self.swapped_this_block == swapped_this_block
+            && self.last_real_time == last_real_time
+            && self
+                .active_tick
                 .zip(active_tick)
                 .is_none_or(|(t1, t2)| t1 == t2)
     }
@@ -284,11 +285,11 @@ fn gas_costs(
             },
     }: EvmBoostedFeesConcentratedPoolResources,
 ) -> u64 {
-    concentrated::gas_costs(concentrated) +
-        EXTRA_BASE_GAS_COST +
-        u64::from(extra_distinct_bitmap_lookups) * GAS_COST_OF_ONE_BITMAP_SLOAD +
-        u64::from(virtual_donate_delta_times_crossed) *
-            GAS_COST_OF_CROSSING_ONE_VIRTUAL_DONATE_DELTA +
-        u64::from(virtual_donations_executed) * GAS_COST_OF_EXECUTING_VIRTUAL_DONATIONS +
-        u64::from(fees_accumulated) * GAS_COST_OF_FEE_ACCUMULATION
+    concentrated::gas_costs(concentrated)
+        + EXTRA_BASE_GAS_COST
+        + u64::from(extra_distinct_bitmap_lookups) * GAS_COST_OF_ONE_BITMAP_SLOAD
+        + u64::from(virtual_donate_delta_times_crossed)
+            * GAS_COST_OF_CROSSING_ONE_VIRTUAL_DONATE_DELTA
+        + u64::from(virtual_donations_executed) * GAS_COST_OF_EXECUTING_VIRTUAL_DONATIONS
+        + u64::from(fees_accumulated) * GAS_COST_OF_FEE_ACCUMULATION
 }

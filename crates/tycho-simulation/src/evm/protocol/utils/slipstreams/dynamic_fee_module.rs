@@ -144,8 +144,8 @@ pub(crate) fn get_dynamic_fee(
     }
     let base_fee = if dfc.base_fee != 0 { dfc.base_fee } else { default_base_fee };
 
-    if dfc.initial_fee_enabled &&
-        observations.timestamp_at(observation_index, observation_cardinality)? != blocktime
+    if dfc.initial_fee_enabled
+        && observations.timestamp_at(observation_index, observation_cardinality)? != blocktime
     {
         return match dfc.initial_fee {
             0 => Ok(base_fee),
@@ -159,8 +159,8 @@ pub(crate) fn get_dynamic_fee(
     } else {
         (DEFAULT_SCALING_FACTOR, DEFAULT_FEE_CAP)
     };
-    let total_fee = base_fee +
-        calculate_dynamic_fee(
+    let total_fee = base_fee
+        + calculate_dynamic_fee(
             current_tick,
             liquidity,
             observation_index,

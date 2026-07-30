@@ -510,10 +510,10 @@ mod tests {
         let last_refill = 1_767_694_523u64;
         let refill_rate = 23_148u64;
 
-        let value = U256::from(capacity) |
-            (U256::from(remaining) << 64u32) |
-            (U256::from(last_refill) << 128u32) |
-            (U256::from(refill_rate) << 192u32);
+        let value = U256::from(capacity)
+            | (U256::from(remaining) << 64u32)
+            | (U256::from(last_refill) << 128u32)
+            | (U256::from(refill_rate) << 192u32);
 
         let limit = BucketLimit::from_u256(value);
         assert_eq!(limit.capacity, capacity);
@@ -529,9 +529,9 @@ mod tests {
         let exit_fee = 30u16;
         let low_watermark = 100u16;
 
-        let value = U256::from(u64::from(exit_fee_split)) |
-            (U256::from(u64::from(exit_fee)) << 16u32) |
-            (U256::from(u64::from(low_watermark)) << 32u32);
+        let value = U256::from(u64::from(exit_fee_split))
+            | (U256::from(u64::from(exit_fee)) << 16u32)
+            | (U256::from(u64::from(low_watermark)) << 32u32);
 
         let info = RedemptionInfo::from_u256(limit, value);
         assert_eq!(info.limit, limit);

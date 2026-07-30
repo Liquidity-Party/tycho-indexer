@@ -140,8 +140,8 @@ impl RamsesV3State {
         };
         let mut gas_used = U256::from(SWAP_BASE_GAS);
 
-        while state.amount_remaining != I256::from_raw(U256::from(0u64)) &&
-            state.sqrt_price != price_limit
+        while state.amount_remaining != I256::from_raw(U256::from(0u64))
+            && state.sqrt_price != price_limit
         {
             let (mut next_tick, initialized) = match self
                 .ticks
@@ -535,12 +535,12 @@ impl ProtocolSim for RamsesV3State {
             return false;
         };
 
-        &self.liquidity == liquidity &&
-            &self.sqrt_price == sqrt_price &&
-            &self.fee == fee &&
-            &self.tick == tick &&
-            &self.tick_spacing == tick_spacing &&
-            &self.ticks == ticks
+        &self.liquidity == liquidity
+            && &self.sqrt_price == sqrt_price
+            && &self.fee == fee
+            && &self.tick == tick
+            && &self.tick_spacing == tick_spacing
+            && &self.ticks == ticks
     }
 }
 
