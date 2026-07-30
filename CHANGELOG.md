@@ -1,3 +1,75 @@
+## [0.344.0](https://github.com/propeller-heads/tycho/compare/0.343.0...0.344.0) (2026-07-29)
+
+
+### Features
+
+* **execution:** prefetch Angstrom attestations in the background ([f0c7a06](https://github.com/propeller-heads/tycho/commit/f0c7a06ad5c2b25193983eb1566771e69f8c545c))
+* **execution:** prefetch Angstrom attestations in the background ([#1241](https://github.com/propeller-heads/tycho/issues/1241)) ([88f1696](https://github.com/propeller-heads/tycho/commit/88f169632942987f40eb275539d00135f44feaab))
+
+
+### Bug Fixes
+
+* **execution:** fail on an unparsable ANGSTROM_BLOCKS_IN_FUTURE ([4a72e0e](https://github.com/propeller-heads/tycho/commit/4a72e0e9bb20983aaacff36b6147c7c834b5f87d))
+* **execution:** keep the caller's slack when serving a cached window ([bef440d](https://github.com/propeller-heads/tycho/commit/bef440d55a47ab8f646b9d62c26bb905f48690c8))
+* **execution:** raise the Angstrom API timeout to half the refresh interval ([fa18e35](https://github.com/propeller-heads/tycho/commit/fa18e35bed501aaca8a081a25a2e74d23f2d227d))
+* **execution:** reject an empty Angstrom attestation window ([dd5d8e2](https://github.com/propeller-heads/tycho/commit/dd5d8e2136629bb13789245555605c764cd8504a))
+* **execution:** report a missing API key instead of a cold cache ([b058a5d](https://github.com/propeller-heads/tycho/commit/b058a5d71e32c34e94ffdf4547eea5196878ebd2))
+
+## [0.343.0](https://github.com/propeller-heads/tycho/compare/0.342.0...0.343.0) (2026-07-29)
+
+
+### Features
+
+* add Robinhood as a first-class chain ([e47f1a6](https://github.com/propeller-heads/tycho/commit/e47f1a6cb9c3240b1c6efa85cbab57cbad237b28))
+* add Robinhood as a first-class chain ([#1247](https://github.com/propeller-heads/tycho/issues/1247)) ([4cb0ce8](https://github.com/propeller-heads/tycho/commit/4cb0ce85e3011c1e435a000dbfdbba95c0eb0e12))
+* add Robinhood Chain substreams YAML configs (Uniswap V2 + V3) ([4b96aef](https://github.com/propeller-heads/tycho/commit/4b96aefc7c35b1ab9cac427aec8e11a395ad9c6b))
+* add Robinhood Chain substreams YAML configs (Uniswap V2 + V3) ([#1245](https://github.com/propeller-heads/tycho/issues/1245)) ([871fdb9](https://github.com/propeller-heads/tycho/commit/871fdb94e022ddc0ffe081eea9c939c76dc58468))
+* add Robinhood Uniswap V4 no-hooks Substreams manifest ([a7c0c9d](https://github.com/propeller-heads/tycho/commit/a7c0c9d8368eca4f68e4b6ab96c11f5cb81d7ef2))
+* add Robinhood Uniswap V4 no-hooks Substreams manifest ([#1249](https://github.com/propeller-heads/tycho/issues/1249)) ([c07dd30](https://github.com/propeller-heads/tycho/commit/c07dd30468ca7998f9b870cc2b53125a4cc92c81))
+
+
+### Bug Fixes
+
+* align Robinhood Substreams packages with CI ([f940afd](https://github.com/propeller-heads/tycho/commit/f940afd3a34468592c155ecfd0545f54ac3628ba))
+* update Uniswap V4 package compatibility ([a8bc64c](https://github.com/propeller-heads/tycho/commit/a8bc64c973c9dc5b7adf38fd0b9293ae50df211f))
+
+## [0.342.0](https://github.com/propeller-heads/tycho/compare/0.341.11...0.342.0) (2026-07-29)
+
+
+### Features
+
+* **ekubo_v3:** exclude SignedExclusiveSwap pools by default ([1a32a58](https://github.com/propeller-heads/tycho/commit/1a32a5831b8212eb985c1f226dbe6d9bc748204d))
+
+
+### Bug Fixes
+
+* **ekubo_v3:** exclude SignedExclusiveSwap pools by default ([#1242](https://github.com/propeller-heads/tycho/issues/1242)) ([81246b9](https://github.com/propeller-heads/tycho/commit/81246b9c891493f4b93c4c685f41126d9a5a263b))
+
+## [0.341.11](https://github.com/propeller-heads/tycho/compare/0.341.10...0.341.11) (2026-07-29)
+
+
+### Bug Fixes
+
+* **indexer:** apply pending account balances in PendingDeltas snapshots ([4b1babf](https://github.com/propeller-heads/tycho/commit/4b1babfd5de0b27707b60638e4ecc7dee9ec16c4)), closes [#1230](https://github.com/propeller-heads/tycho/issues/1230)
+* **indexer:** apply pending account balances in PendingDeltas snapshots ([#1232](https://github.com/propeller-heads/tycho/issues/1232)) ([eb51448](https://github.com/propeller-heads/tycho/commit/eb51448de0c74a14b87617636f31d9148cb60c0d))
+
+## [0.341.10](https://github.com/propeller-heads/tycho/compare/0.341.9...0.341.10) (2026-07-29)
+
+
+### Bug Fixes
+
+* **simulation:** refresh both balance maps in VM update_pool_state ([39a2f82](https://github.com/propeller-heads/tycho/commit/39a2f82983e600c375ba376fd3cdb5ba0c920248))
+* **simulation:** refresh both VM balance maps and make the price-query caller configurable ([#1234](https://github.com/propeller-heads/tycho/issues/1234)) ([e241055](https://github.com/propeller-heads/tycho/commit/e241055b8fec276579a79fb3891c214e9cf7500b))
+* **simulation:** use zero tx.origin for Balancer V3 price queries ([de68cc2](https://github.com/propeller-heads/tycho/commit/de68cc2e4bc9c155f3b2f30f17264abb53b320b1))
+
+## [0.341.9](https://github.com/propeller-heads/tycho/compare/0.341.8...0.341.9) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([4b8941b](https://github.com/propeller-heads/tycho/commit/4b8941b0675091a83d840ed57a0987725332ee04))
+* **ethereum-balancer-v2:** track dynamic admin swap fee changes ([#1229](https://github.com/propeller-heads/tycho/issues/1229)) ([8e71e9e](https://github.com/propeller-heads/tycho/commit/8e71e9eb7c12d11c8fb7b0afcd5bfb84c40a50aa))
+
 ## [0.341.8](https://github.com/propeller-heads/tycho/compare/0.341.7...0.341.8) (2026-07-28)
 
 
