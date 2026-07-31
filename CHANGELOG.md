@@ -1,3 +1,11 @@
+## [0.346.1](https://github.com/propeller-heads/tycho/compare/0.346.0...0.346.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **deps:** bump ruint to 1.20.0 for RUSTSEC-2026-0220 ([c32656b](https://github.com/propeller-heads/tycho/commit/c32656be41e763583a26eea01d18705a844dffbf))
+* **deps:** bump ruint to 1.20.0 for RUSTSEC-2026-0220 ([#1258](https://github.com/propeller-heads/tycho/issues/1258)) ([d336e02](https://github.com/propeller-heads/tycho/commit/d336e02b8609235f3b40d56207484b463b9af471))
+
 ## [0.346.0](https://github.com/propeller-heads/tycho/compare/0.345.1...0.346.0) (2026-07-30)
 
 
