@@ -279,6 +279,9 @@ where
     /// components — including every component of exchanges without a predicate — carry no such
     /// attribute. Consumers use the tag to segregate pools whose swaps require off-chain
     /// authorization from public routing.
+    ///
+    /// Presence of the attribute is the signal: its value is always `0x01`, so consumers should
+    /// test whether the key exists rather than parse the value.
     pub fn register_exclusivity(&mut self, exchange: &str, predicate: FilterFn) {
         self.exclusivity_fns
             .insert(exchange.to_string(), predicate);
