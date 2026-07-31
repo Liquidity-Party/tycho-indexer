@@ -130,7 +130,7 @@ use crate::{
         override_stream::{self, StateOverrideProvider},
         pending::PendingBlockProcessor,
         protocol::{
-            filters::uniswap_v4_non_angstrom_hook_pool_filter,
+            ekubo_v3, filters::uniswap_v4_non_angstrom_hook_pool_filter,
             native_wrapper::state::NativeWrapperState,
             uniswap_v4::hooks::hook_handler_creator::initialize_hook_handlers,
         },
@@ -158,6 +158,16 @@ fn default_filter_fn(name: &str) -> Option<fn(&ComponentWithState) -> bool> {
         return Some(uniswap_v4_non_angstrom_hook_pool_filter);
     }
     None
+}
+
+/// The exclusivity predicate for exchange `name`, or `None` if the protocol has no exclusive
+/// pools. Components matching the predicate get an `is_exclusive` static attribute so consumers
+/// can keep pools requiring off-chain swap authorization out of public routing.
+fn exclusivity_fn(name: &str) -> Option<fn(&ComponentWithState) -> bool> {
+    match name {
+        "ekubo_v3" => Some(ekubo_v3::is_exclusive),
+        _ => None,
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -329,6 +339,10 @@ impl ProtocolStreamBuilder {
             self.decoder
                 .register_filter(name, predicate);
         }
+        if let Some(predicate) = exclusivity_fn(name) {
+            self.decoder
+                .register_exclusivity(name, predicate);
+        }
 
         if EXCHANGES_REQUIRING_FILTER.contains(&name) && filter_fn.is_none() {
             warn!(
@@ -388,6 +402,10 @@ impl ProtocolStreamBuilder {
         } else if let Some(predicate) = default_filter_fn(name) {
             self.decoder
                 .register_filter(name, predicate);
+        }
+        if let Some(predicate) = exclusivity_fn(name) {
+            self.decoder
+                .register_exclusivity(name, predicate);
         }
 
         if EXCHANGES_REQUIRING_FILTER.contains(&name) && filter_fn.is_none() {

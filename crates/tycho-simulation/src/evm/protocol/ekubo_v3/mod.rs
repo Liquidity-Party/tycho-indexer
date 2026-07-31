@@ -13,9 +13,7 @@ mod test_cases;
 
 /// Extension contracts that gate swaps behind off-chain authorization. A component carrying one
 /// of these in its `extension` static attribute is exclusive.
-///
-/// Used by Fynd to filter exclusive components out of public-only routing graphs.
-pub const EXCLUSIVE_EXTENSIONS: &[Address] = &[addresses::SIGNED_EXCLUSIVE_SWAP_ADDRESS];
+const EXCLUSIVE_EXTENSIONS: &[Address] = &[addresses::SIGNED_EXCLUSIVE_SWAP_ADDRESS];
 
 /// The extension type of `component`, or `None` if the extension attribute is missing, malformed,
 /// or unsupported.
@@ -44,6 +42,17 @@ pub fn filter_fn(component: &ComponentWithState) -> bool {
 /// Only use this if you can supply the per-swap signature these pools require; see `filter_fn`.
 pub fn filter_fn_with_signed_exclusive_swap(component: &ComponentWithState) -> bool {
     component_extension_type(component).is_some()
+}
+
+/// Whether `component` gates swaps behind off-chain authorization. Missing or malformed attributes
+/// are not exclusive.
+pub(crate) fn is_exclusive(component: &ComponentWithState) -> bool {
+    component
+        .component
+        .static_attributes
+        .get("extension")
+        .and_then(|bytes| Address::try_from(&bytes[..]).ok())
+        .is_some_and(|extension| EXCLUSIVE_EXTENSIONS.contains(&extension))
 }
 
 #[cfg(test)]
@@ -84,6 +93,7 @@ mod tests {
 
         assert!(!filter_fn(&signed));
         assert!(filter_fn_with_signed_exclusive_swap(&signed));
+        assert!(is_exclusive(&signed));
     }
 
     #[test]
@@ -93,6 +103,7 @@ mod tests {
 
         assert!(filter_fn(&oracle));
         assert!(filter_fn_with_signed_exclusive_swap(&oracle));
+        assert!(!is_exclusive(&oracle));
 
         // An extension without swap call points passes regardless of its address.
         let no_call_points = with_extension(address!("0x0000000000000000000000000000000000000001"));
@@ -115,12 +126,13 @@ mod tests {
         for case in [component(None), component(Some(Bytes::from(vec![0u8; 19])))] {
             assert!(!filter_fn(&case));
             assert!(!filter_fn_with_signed_exclusive_swap(&case));
+            assert!(!is_exclusive(&case));
         }
     }
 
-    /// `EXCLUSIVE_EXTENSIONS` and the filters must agree: every listed marker is excluded by the
-    /// default filter and admitted by the inclusive one, so consumers classifying with the list
-    /// see exactly the components the inclusive filter let through.
+    /// `EXCLUSIVE_EXTENSIONS`, the filters, and `is_exclusive` must agree: every listed marker is
+    /// excluded by the default filter, admitted by the inclusive one, and classified as exclusive,
+    /// so consumers see exactly the components the inclusive filter let through.
     #[test]
     fn exclusive_extensions_consistent_with_filters() {
         for extension in EXCLUSIVE_EXTENSIONS {
@@ -128,6 +140,7 @@ mod tests {
 
             assert!(!filter_fn(&component));
             assert!(filter_fn_with_signed_exclusive_swap(&component));
+            assert!(is_exclusive(&component));
         }
     }
 }
