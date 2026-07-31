@@ -20,6 +20,7 @@ Currently, Tycho supports the following protocols:
 <tr><td><code>vm:maverick_v2</code></td><td>VM (<code>EVMPoolState</code>)</td><td>-</td><td>Ethereum</td><td></td></tr>
 <tr><td><code>vm:bopamm</code></td><td>VM (<code>EVMPoolState</code>)</td><td>-</td><td>Ethereum</td><td></td></tr>
 <tr><td><code>vm:fermiswap</code></td><td>VM (<code>EVMPoolState</code>)</td><td>4 ms</td><td>Ethereum</td><td></td></tr>
+<tr><td><code>aerodrome_v1</code></td><td>Native (<code>AerodromeV1State</code>)</td><td>3 μs (0.003 ms)</td><td>Base</td><td></td></tr>
 <tr><td><code>aerodrome_slipstreams</code></td><td><p>Native</p><p>(<code>AerodromeSlipstreamsState</code>)</p></td><td>-</td><td>Base</td><td></td></tr>
 <tr><td><code>lunarbase</code></td><td>Native (<code>LunarBaseState</code>)</td><td>7 μs (0.007 ms)</td><td>Base</td><td></td></tr>
 <tr><td><code>rocketpool</code></td><td>Native (<code>RocketpoolState</code>)</td><td>-</td><td>Ethereum</td><td>Note: the DepositPool was recently updated to v1.4. This new version is supported by tycho_simulation <a href="https://github.com/propeller-heads/tycho-simulation/releases/tag/0.248.0" target="_blank" rel="noopener noreferrer">> v0.248.0</a> and above.</td></tr>
@@ -71,6 +72,7 @@ fn register_exchanges(
                 .exchange::<UniswapV3State>("uniswap_v3", tvl_filter.clone(), None)
                 .exchange::<UniswapV4State>("uniswap_v4", tvl_filter.clone(), None)
                 .exchange::<UniswapV3State>("pancakeswap_v3", tvl_filter.clone(), None)
+                .exchange::<AerodromeV1State>("aerodrome_v1", tvl_filter.clone(), None)
                 .exchange::<AerodromeSlipstreamsState>("aerodrome_slipstreams", tvl_filter.clone(), None)
                 .exchange::<LunarBaseState>("lunarbase", tvl_filter.clone(), None)
         }
