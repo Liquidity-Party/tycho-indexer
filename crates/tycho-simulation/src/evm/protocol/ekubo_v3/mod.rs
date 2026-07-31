@@ -2,7 +2,7 @@ use decoder::{extension_type, ExtensionType};
 use revm::primitives::Address;
 use tycho_client::feed::synchronizer::ComponentWithState;
 
-pub(crate) mod addresses;
+mod addresses;
 mod attributes;
 mod decoder;
 mod pool;
@@ -10,10 +10,6 @@ pub mod state;
 
 #[cfg(test)]
 mod test_cases;
-
-/// Extension contracts that gate swaps behind off-chain authorization. A component carrying one
-/// of these in its `extension` static attribute is exclusive.
-const EXCLUSIVE_EXTENSIONS: &[Address] = &[addresses::SIGNED_EXCLUSIVE_SWAP_ADDRESS];
 
 /// The extension type of `component`, or `None` if the extension attribute is missing, malformed,
 /// or unsupported.
@@ -47,12 +43,7 @@ pub fn filter_fn_with_signed_exclusive_swap(component: &ComponentWithState) -> b
 /// Whether `component` gates swaps behind off-chain authorization. Missing or malformed attributes
 /// are not exclusive.
 pub(crate) fn is_exclusive(component: &ComponentWithState) -> bool {
-    component
-        .component
-        .static_attributes
-        .get("extension")
-        .and_then(|bytes| Address::try_from(&bytes[..]).ok())
-        .is_some_and(|extension| EXCLUSIVE_EXTENSIONS.contains(&extension))
+    matches!(component_extension_type(component), Some(ExtensionType::SignedExclusiveSwap))
 }
 
 #[cfg(test)]
@@ -127,20 +118,6 @@ mod tests {
             assert!(!filter_fn(&case));
             assert!(!filter_fn_with_signed_exclusive_swap(&case));
             assert!(!is_exclusive(&case));
-        }
-    }
-
-    /// `EXCLUSIVE_EXTENSIONS`, the filters, and `is_exclusive` must agree: every listed marker is
-    /// excluded by the default filter, admitted by the inclusive one, and classified as exclusive,
-    /// so consumers see exactly the components the inclusive filter let through.
-    #[test]
-    fn exclusive_extensions_consistent_with_filters() {
-        for extension in EXCLUSIVE_EXTENSIONS {
-            let component = with_extension(*extension);
-
-            assert!(!filter_fn(&component));
-            assert!(filter_fn_with_signed_exclusive_swap(&component));
-            assert!(is_exclusive(&component));
         }
     }
 }
