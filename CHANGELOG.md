@@ -1,3 +1,14 @@
+## [0.348.1](https://github.com/propeller-heads/tycho/compare/0.348.0...0.348.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **testing:** fail protocol tests on execution failures ([627ace1](https://github.com/propeller-heads/tycho/commit/627ace141413c084bad19212cbfe315b34ad3eed)), closes [#1083](https://github.com/propeller-heads/tycho/issues/1083)
+* **testing:** fail protocol tests when executions fail ([#1246](https://github.com/propeller-heads/tycho/issues/1246)) ([91af829](https://github.com/propeller-heads/tycho/commit/91af829bc5e40711177f946e6ccdb30955cd3a5b))
+* **testing:** fail zero-output and unevaluable executions ([ad3bf2f](https://github.com/propeller-heads/tycho/commit/ad3bf2fadabc7ae3b71042311a07f940e4e85f4c))
+* **testing:** stop logging unchecked executions as passed ([96b1ca6](https://github.com/propeller-heads/tycho/commit/96b1ca60fc4bfca96504aef74b4d56ae7d66cfdf))
+* **tycho-indexer:** support non-ethereum chains in rpc subcommand ([#1237](https://github.com/propeller-heads/tycho/issues/1237)) ([f2cf63a](https://github.com/propeller-heads/tycho/commit/f2cf63a49aa27c165e07e9c33c4106165b1b1641))
+
 ## [0.348.0](https://github.com/propeller-heads/tycho/compare/0.347.0...0.348.0) (2026-08-03)
 
 
