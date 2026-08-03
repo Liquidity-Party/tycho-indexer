@@ -236,6 +236,7 @@ impl ProtocolStreamProcessor {
                     "uniswap_v3".to_string(),
                     "uniswap_v4".to_string(),
                     "quickswap_v2".to_string(),
+                    "ramses_v3".to_string(),
                 ]
             }
             Chain::Arbitrum => {
