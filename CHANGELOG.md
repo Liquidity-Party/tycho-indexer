@@ -1,3 +1,17 @@
+## [0.347.0](https://github.com/propeller-heads/tycho/compare/0.346.1...0.347.0) (2026-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* BalanceSlotDetector::detect_balance_slots and
+AllowanceSlotDetector::detect_allowance_slots drop their block_hash parameter.
+
+Co-authored-by: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+### Features
+
+* detect token slots at the latest block ([#1211](https://github.com/propeller-heads/tycho/issues/1211)) ([0f0260b](https://github.com/propeller-heads/tycho/commit/0f0260b103f30750e0d9a995c9ffe450c8222c0e))
+
 ## [0.346.1](https://github.com/propeller-heads/tycho/compare/0.346.0...0.346.1) (2026-07-31)
 
 
