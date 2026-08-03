@@ -35,9 +35,12 @@ use crate::evm::protocol::{
     u256_num::u256_to_f64,
 };
 
-/// Gas cost of `Core.forward` plus the signature check, on top of the swap itself.
+/// Gas cost of `Core.forward`, the signature check and the signed-fee accounting, on top of the
+/// swap itself.
 ///
-/// Measured against a plain-swap baseline in Ekubo's `SignedExclusiveSwap.t.sol`.
+/// Measured against a plain-swap baseline in Ekubo's `SignedExclusiveSwap.t.sol`: `forward` plus
+/// the signature check costs 37,852 and charging the signed fee costs another 24,521. Fynd signs a
+/// fee above zero, so the constant is the sum of both.
 const SIGNED_EXCLUSIVE_SWAP_GAS: u64 = 62_373;
 
 #[enum_delegate::implement(EkuboPool)]
