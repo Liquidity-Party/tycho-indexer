@@ -40,12 +40,6 @@ pub fn filter_fn_with_signed_exclusive_swap(component: &ComponentWithState) -> b
     component_extension_type(component).is_some()
 }
 
-/// Whether `component` gates swaps behind off-chain authorization. Missing or malformed attributes
-/// are not exclusive.
-pub(crate) fn is_exclusive(component: &ComponentWithState) -> bool {
-    matches!(component_extension_type(component), Some(ExtensionType::SignedExclusiveSwap))
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -84,7 +78,6 @@ mod tests {
 
         assert!(!filter_fn(&signed));
         assert!(filter_fn_with_signed_exclusive_swap(&signed));
-        assert!(is_exclusive(&signed));
     }
 
     #[test]
@@ -94,7 +87,6 @@ mod tests {
 
         assert!(filter_fn(&oracle));
         assert!(filter_fn_with_signed_exclusive_swap(&oracle));
-        assert!(!is_exclusive(&oracle));
 
         // An extension without swap call points passes regardless of its address.
         let no_call_points = with_extension(address!("0x0000000000000000000000000000000000000001"));
@@ -117,7 +109,6 @@ mod tests {
         for case in [component(None), component(Some(Bytes::from(vec![0u8; 19])))] {
             assert!(!filter_fn(&case));
             assert!(!filter_fn_with_signed_exclusive_swap(&case));
-            assert!(!is_exclusive(&case));
         }
     }
 }

@@ -101,9 +101,6 @@ where
     min_token_quality: u32,
     registry: HashMap<String, Box<RegistryFn<H>>>,
     inclusion_filters: HashMap<String, FilterFn>,
-    /// Per-protocol predicates marking components as exclusive (swaps gated behind off-chain
-    /// authorization).
-    exclusivity_fns: HashMap<String, FilterFn>,
     /// Live override providers keyed by `protocol_system`. A pool of that protocol subscribes to
     /// its provider at creation time and reads fresh overrides on every simulation.
     override_providers: HashMap<String, Arc<dyn StateOverrideProvider>>,
@@ -138,7 +135,6 @@ where
             min_token_quality: 100,
             registry: HashMap::new(),
             inclusion_filters: HashMap::new(),
-            exclusivity_fns: HashMap::new(),
             override_providers: HashMap::new(),
         }
     }
@@ -271,19 +267,6 @@ where
     /// application.
     pub fn register_filter(&mut self, exchange: &str, predicate: FilterFn) {
         self.inclusion_filters
-            .insert(exchange.to_string(), predicate);
-    }
-
-    /// Associates an exclusivity predicate with an exchange ID. Components for which the
-    /// predicate returns true are tagged with an `is_exclusive` static attribute; all other
-    /// components — including every component of exchanges without a predicate — carry no such
-    /// attribute. Consumers use the tag to segregate pools whose swaps require off-chain
-    /// authorization from public routing.
-    ///
-    /// Presence of the attribute is the signal: its value is always `0x01`, so consumers should
-    /// test whether the key exists rather than parse the value.
-    pub fn register_exclusivity(&mut self, exchange: &str, predicate: FilterFn) {
-        self.exclusivity_fns
             .insert(exchange.to_string(), predicate);
     }
 
@@ -588,19 +571,10 @@ where
                             }
                         }
                     }
-                    let mut component = ProtocolComponent::from_with_tokens(
+                    let component = ProtocolComponent::from_with_tokens(
                         snapshot.component.clone(),
                         component_tokens,
                     );
-                    if self
-                        .exclusivity_fns
-                        .get(protocol.as_str())
-                        .is_some_and(|is_exclusive| is_exclusive(&snapshot))
-                    {
-                        component
-                            .static_attributes
-                            .insert("is_exclusive".to_string(), Bytes::from(vec![1u8]));
-                    }
 
                     // Add new tokens to the simulation engine
                     if !new_tokens_accounts.is_empty() {
@@ -1354,40 +1328,6 @@ mod tests {
         assert_eq!(res2.states.len(), 1);
         assert_eq!(res1.sync_states.len(), 1);
         assert_eq!(res2.sync_states.len(), 1);
-    }
-
-    #[rstest]
-    #[case::predicate_matches(Some::<FilterFn>(|_| true), true)]
-    #[case::predicate_rejects(Some::<FilterFn>(|_| false), false)]
-    #[case::no_predicate_registered(None, false)]
-    #[tokio::test]
-    async fn test_decode_exclusivity_tagging(
-        #[case] predicate: Option<FilterFn>,
-        #[case] expect_tagged: bool,
-    ) {
-        let mut decoder = setup_decoder(true).await;
-        if let Some(predicate) = predicate {
-            decoder.register_exclusivity("uniswap_v2", predicate);
-        }
-
-        let res = decoder
-            .decode(&load_test_msg("uniswap_v2_snapshot"))
-            .await
-            .expect("decode failure");
-
-        let component = res
-            .new_pairs
-            .values()
-            .next()
-            .expect("no new pairs decoded");
-        assert_eq!(
-            component
-                .static_attributes
-                .get("is_exclusive"),
-            expect_tagged
-                .then(|| Bytes::from(vec![1u8]))
-                .as_ref()
-        );
     }
 
     #[tokio::test]
