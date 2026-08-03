@@ -1,3 +1,11 @@
+## [0.348.0](https://github.com/propeller-heads/tycho/compare/0.347.0...0.348.0) (2026-08-03)
+
+
+### Features
+
+* enable balancer_v3 integration test ([48961cd](https://github.com/propeller-heads/tycho/commit/48961cda66341acfff57ce58736fa749d8cae1cd))
+* enable balancer_v3 integration test ([#1266](https://github.com/propeller-heads/tycho/issues/1266)) ([2b72e51](https://github.com/propeller-heads/tycho/commit/2b72e5167ce039eebc48ac5a731ee939c90b1078))
+
 ## [0.347.0](https://github.com/propeller-heads/tycho/compare/0.346.1...0.347.0) (2026-08-03)
 
 
