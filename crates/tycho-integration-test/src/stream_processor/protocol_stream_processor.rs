@@ -203,6 +203,7 @@ impl ProtocolStreamProcessor {
                 "vm:liquidityparty".to_string(),
                 "vm:fermiswap".to_string(),
                 "vm:bopamm".to_string(),
+                "vm:balancer_v3".to_string(),
             ],
             Chain::Base => vec![
                 "uniswap_v2".to_string(),
@@ -386,6 +387,13 @@ impl ProtocolStreamProcessor {
             }
             "lunarbase" => {
                 stream = stream.exchange::<LunarBaseState>("lunarbase", tvl_filter.clone(), None);
+            }
+            "vm:balancer_v3" => {
+                stream = stream.exchange::<EVMPoolState<PreCachedDB>>(
+                    "vm:balancer_v3",
+                    tvl_filter.clone(),
+                    None,
+                );
             }
             _ => {
                 return Err(miette::miette!("Unknown protocol: {}", protocol));
