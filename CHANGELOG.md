@@ -1,3 +1,11 @@
+## [0.348.2](https://github.com/propeller-heads/tycho/compare/0.348.1...0.348.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* **simulation:** charge forward overhead on signed exclusive Ekubo pools ([4d586c6](https://github.com/propeller-heads/tycho/commit/4d586c67de87745421ac34f5b5d09532aa87c750))
+* **simulation:** charge forward overhead on signed exclusive Ekubo pools ([#1257](https://github.com/propeller-heads/tycho/issues/1257)) ([38343c3](https://github.com/propeller-heads/tycho/commit/38343c38be308860f393102339c58538805c8dd2))
+
 ## [0.348.1](https://github.com/propeller-heads/tycho/compare/0.348.0...0.348.1) (2026-08-03)
 
 
