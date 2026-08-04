@@ -1,3 +1,19 @@
+## [0.349.0](https://github.com/propeller-heads/tycho/compare/0.348.2...0.349.0) (2026-08-04)
+
+
+### Features
+
+* export EXCLUSIVE_EXTENSIONS marker list ([03d4a19](https://github.com/propeller-heads/tycho/commit/03d4a1980efc11096b8332ddeb84c10b0038a31a))
+* tag exclusive components with is_exclusive static attribute ([78a87f6](https://github.com/propeller-heads/tycho/commit/78a87f6fcea233248b29592b89be07940d3e7c7a))
+* tag exclusive components with is_exclusive static attribute ([#1254](https://github.com/propeller-heads/tycho/issues/1254)) ([6ca654d](https://github.com/propeller-heads/tycho/commit/6ca654d0dbe9e180d3728f990b25ac25dc35d41c))
+
+
+### Reverts
+
+* Revert "chore: add real address" ([363442d](https://github.com/propeller-heads/tycho/commit/363442dff9d3648c49e1b65c6c69d2bc79eb5d72))
+* Revert "Revert "refactor: move ekubo_v3 is_exclusive tagging into indexing"" ([1f798d5](https://github.com/propeller-heads/tycho/commit/1f798d5ba6f1ab1918211ad86e307209ef54ac17))
+* Revert "refactor: move ekubo_v3 is_exclusive tagging into indexing" ([ef47309](https://github.com/propeller-heads/tycho/commit/ef47309fbec1cb6921a76950b843db66dd069b5b))
+
 ## [0.348.2](https://github.com/propeller-heads/tycho/compare/0.348.1...0.348.2) (2026-08-03)
 
 
