@@ -1,11 +1,5 @@
 # Changelog
 
-## v0.1.2
-
-- Tag SignedExclusiveSwap pools with the reserved `is_exclusive` static attribute
-  (value `[1u8]`) at component creation, so consumers can keep pools requiring
-  off-chain swap authorization out of public routing.
-
 ## v0.1.1
 
 - Pin the Rust toolchain to 1.96.0 for reproducible wasm builds. The package
