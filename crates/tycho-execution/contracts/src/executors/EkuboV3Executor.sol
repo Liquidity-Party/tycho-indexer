@@ -47,8 +47,9 @@ address constant MEV_CAPTURE_ADDRESS =
 // (SignedExclusiveSwap, forward-only) pools set their pool config extension to
 // this address; the executor detects a signed hop by comparing each hop's
 // poolConfig.extension() against it and routes that hop through the signed path.
+// TODO: replace with the deployed SignedExclusiveSwap extension address.
 address constant SIGNED_EXCLUSIVE_SWAP_ADDRESS =
-    0x55b703eED01b35641963da2FB2E14885993605A3;
+    0x5519eD5e5e5E5E5e5E5E5e5e5e5E5e5e5e5E5E5E;
 
 contract EkuboV3Executor is IExecutor, ICallback {
     error EkuboV3Executor__InvalidDataLength();
