@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.3
+
+- Replace the `SIGNED_EXCLUSIVE_SWAP_ADDRESS` placeholder with the deployed
+  SignedExclusiveSwap extension address, so `is_exclusive` tagging matches
+  real signed pools on-chain.
+
 ## v0.1.2
 
 - Tag SignedExclusiveSwap pools with the reserved `is_exclusive` static attribute
