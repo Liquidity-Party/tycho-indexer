@@ -1,3 +1,11 @@
+## [0.349.1](https://github.com/propeller-heads/tycho/compare/0.349.0...0.349.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* set real SignedExclusiveSwap extension address for Ekubo V3 ([fb557ae](https://github.com/propeller-heads/tycho/commit/fb557aeeb1f8f3017440492800867e0f0e4e3c23))
+* set real SignedExclusiveSwap extension address for Ekubo V3 ([#1284](https://github.com/propeller-heads/tycho/issues/1284)) ([fcc9232](https://github.com/propeller-heads/tycho/commit/fcc923230661fb133714c1fda06647b682b4f5f6))
+
 ## [0.349.0](https://github.com/propeller-heads/tycho/compare/0.348.2...0.349.0) (2026-08-04)
 
 
